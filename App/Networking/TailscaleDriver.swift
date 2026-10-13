@@ -8,6 +8,7 @@ import ZenithKit
 actor TailscaleDriver: PrivateNetworkDriver {
   private var node: TailscaleNode?
   private var controlSession: URLSession?
+  private var interactiveLoginPending = false
 
   func start(interactive: Bool) async throws {
     guard node == nil else { throw PrivateNetworkError.interrupted }
@@ -23,14 +24,13 @@ actor TailscaleDriver: PrivateNetworkDriver {
       authKey: nil, controlURL: kDefaultControlURL, ephemeral: false)
     let created = try TailscaleNode(config: config, logger: QuietTailscaleLogger())
     node = created
+    interactiveLoginPending = interactive
     try await command(.run, node: created)
     try Task.checkCancellation()
-    let status = try await status()
-    if interactive && status.phase == .signInRequired {
-      try await command(.signIn, node: created)
-    }
+    _ = try await status()
   }
   func stop() async {
+    interactiveLoginPending = false
     controlSession?.invalidateAndCancel()
     controlSession = nil
     let previous = node
@@ -41,7 +41,17 @@ actor TailscaleDriver: PrivateNetworkDriver {
   }
   func status() async throws -> PrivateNetworkStatus {
     guard let node else { throw PrivateNetworkError.disconnected }
-    return try PrivateNetworkStatus(data: await node.statusJSON())
+    let status = try PrivateNetworkStatus(data: await node.statusJSON())
+    // Startup may report NoState/Stopped before NeedsLogin. Keep the explicit
+    // user intent until the polling loop sees that state; foreground resume
+    // never requests interactive login. Consume before awaiting to avoid repeats.
+    if interactiveLoginPending && status.phase == .signInRequired {
+      interactiveLoginPending = false
+      try await command(.signIn, node: node)
+      return try PrivateNetworkStatus(data: await node.statusJSON())
+    }
+    if status.phase == .connected { interactiveLoginPending = false }
+    return status
   }
   func configuration() async throws -> URLSessionConfiguration {
     guard let node else { throw PrivateNetworkError.disconnected }

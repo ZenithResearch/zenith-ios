@@ -62,3 +62,11 @@ Connection-file import now appears first, the empty address field has an instruc
 - The isolated Simulator setup app built and launched; the direct/private selector, import placement, address prompt, and collapsed verification controls were visually checked.
 - The complete signed iPhone app built and passed signature verification. A package scan found no local Work deployment values or bundled Work configuration. Build 11 has not yet been installed on the phone.
 - The user confirmed that build 10 opens the sign-in page on the physical phone. Network enrollment, server reachability, and an approved read remain unverified.
+
+## Guided connection and biometric unlock — build 12
+
+- Source: 43 Swift tests pass. New tests cover bounded/validated profile discovery, stale selection, wrong-password rejection before saving, real Rust unlock from a test biometric store, wrong-identity rejection, cancelled/stale reads, failed/interrupted enrollment cleanup, and password fallback. Test doubles do not qualify Keychain access control.
+- Connection UI: the isolated Simulator app discovers an example profile, opens official Tailscale sign-in from one Connect tap, and preserves the selected server after cancellation. The complete app’s password-fallback layout was visually checked without entering credentials. Manual keys remain behind a separate form. No real credentials or private deployment profile are used in the UI fixture.
+- Compatibility: no snapshot, recovery, membership, read-credential or Rust/WASM ABI/schema change. The native repository accepts optional expected lifecycle/identity checks; existing password callers retain their behavior.
+- Device gate: opt in with the current wallet password; verify the actual Face ID prompt, lock/unlock, cancellation, app backgrounding, unavailable/locked biometrics, and password fallback. On a disposable device/identity, change biometric enrollment and remove the device passcode; the saved item must no longer unlock. Disable biometrics and confirm Keychain removal without changing the wallet. Verify Password AutoFill with the person’s chosen manager separately.
+- Networking gate: tap the discovered server, complete sign-in, return to the preserved draft, save, review exact grants and read actual work. Discovery, network membership and server reachability must never be reported as granted read access.

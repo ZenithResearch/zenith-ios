@@ -40,6 +40,7 @@ struct PrivateNetworkRow: View {
     }.padding(.vertical, 4)
     Text("Join the network your server uses. Work access is approved separately.")
       .font(.footnote).foregroundStyle(.secondary)
+      .onAppear { if let url = network.authURL { browser = SignInPage(url: url) } }
       .onChange(of: network.authURL) { _, url in
         if let url { browser = SignInPage(url: url) }
         else { browser = nil }

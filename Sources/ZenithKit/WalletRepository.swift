@@ -168,14 +168,20 @@ public actor WalletRepository {
       throw WalletFailure.conflict
     }
   }
-  public func unlock(password: String) throws -> WalletState {
+  public func unlock(password: String, expectedLifecycle: UInt64? = nil, expectedIdentity: String? = nil) throws -> WalletState {
     try Task.checkCancellation()
-    let ticket = lifecycle.ticket()
+    let ticket = expectedLifecycle ?? lifecycle.ticket()
+    try checkLifecycle(ticket)
     guard let saved = try store.read() else { throw WalletFailure.locked }
     let state = try core.decode(
       ["operation": "unlock", "snapshot": saved.snapshot, "password": password],
       as: WalletState.self)
-    do { return try lifecycle.withCurrent(ticket) { state } } catch {
+    do {
+      return try lifecycle.withCurrent(ticket) {
+        guard expectedIdentity == nil || state.publicKey == expectedIdentity else { throw WalletFailure.conflict }
+        return state
+      }
+    } catch {
       _ = try? core.invoke(["operation": "lock"])
       throw error
     }

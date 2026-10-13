@@ -32,6 +32,8 @@ struct ZenithApp: App {
 @MainActor
 final class WalletModel: ObservableObject {
   let workDraft = WorkServerDraft()
+  let biometricUnlock = BiometricUnlock(store: BiometricKeychain())
+  @Published var biometricEnabled = false
   let privateNetwork = PrivateNetworkModel(driver: TailscaleDriver())
   enum OnboardingCompletion { case created, imported }
   @Published var onboardingCompletion: OnboardingCompletion?
@@ -61,7 +63,7 @@ final class WalletModel: ObservableObject {
   }
   func load() async {
     guard let repository else { return }
-    do { state = try await repository.state() } catch { self.error = error.localizedDescription }
+    do { state = try await repository.state(); biometricEnabled = biometricUnlock.isEnabled } catch { self.error = error.localizedDescription }
   }
   func saveWorkServer(_ configuration: WorkAccessConfiguration?, completion: @escaping () -> Void) {
     guard !busy, let store = workServerStore else { return }
@@ -99,15 +101,21 @@ final class WalletModel: ObservableObject {
         state = try await repository.state()
         guard version == generation else { return }
         busy = false
+        biometricEnabled = biometricUnlock.isEnabled
         success(result)
       } catch {
         guard version == generation else { return }
+        let current = try? await repository.state()
+        guard version == generation else { return }
+        state = current
         busy = false
+        biometricEnabled = biometricUnlock.isEnabled
         self.error = error.localizedDescription
       }
     }
   }
   func suspend() {
+    biometricUnlock.cancel()
     privateNetwork.suspend()
     operation?.cancel()
     operation = nil
@@ -124,6 +132,7 @@ final class WalletModel: ObservableObject {
     }
   }
   func cancel() {
+    biometricUnlock.cancel()
     operation?.cancel()
     operation = nil
     generation += 1

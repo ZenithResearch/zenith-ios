@@ -16,6 +16,8 @@ struct WorkAccessView: View {
   @State private var client: DevgraphReadClient?
   @State private var proposal: ReadAccessProposal?
   @State private var current: NativeReadManifest?
+  @State private var continueSetup = false
+  @Environment(\.dismiss) private var dismiss
   var body: some View {
     Group {
       if let client {
@@ -49,7 +51,7 @@ struct WorkAccessView: View {
                 }) {
                   current = $0
                   self.proposal = nil
-                  model.notice = "Read-only access saved. Open Work to read your items."
+                  model.notice = "Connected. Your work is ready to read."
                 }
               }.buttonStyle(.borderedProminent)
                 .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(model.busy)
@@ -68,6 +70,7 @@ struct WorkAccessView: View {
                 value: Date(timeIntervalSince1970: Double(current.expires_at)).formatted())
             }
             Section {
+              Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
               Button("Remove read access") {
                 model.perform({ _ in try await client.disconnect() }) { _ in
                   self.current = nil
@@ -80,16 +83,19 @@ struct WorkAccessView: View {
             }
           } else if model.state?.membershipActive != true {
             Section {
-              Text("Set up Membership before connecting work.")
+              Text("Join Zenith to continue").font(.headline)
+              Text("Your server is saved. Set up Membership, then return here to approve read-only access.")
               NavigationLink("Open Membership") { MembershipView() }
             }
           } else {
             Section {
-              Text("Review the permitted work and expiry before connecting.")
-              Button("Review work access") {
+              Text("Approve what you can read").font(.headline)
+              Text("Next, your server shows the work available to you and when access expires.")
+              Button("Continue") {
                 model.perform({ _ in try await client.prepare() }) { proposal = $0 }
               }.buttonStyle(.borderedProminent)
-                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(model.busy)
+                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+                .disabled(model.busy || (client.connection.network == .tailscale && privateNetwork.phase != .connected))
             }
           }
           Section {
@@ -104,6 +110,7 @@ struct WorkAccessView: View {
         }.navigationTitle("Work access")
       } else {
         WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
+          continueSetup = true
           model.saveWorkServer(configuration) {}
         }
       }
@@ -116,6 +123,10 @@ struct WorkAccessView: View {
       let manifest = try? await client?.manifest()
       guard !Task.isCancelled, version == model.generation else { return }
       current = manifest
+      if continueSetup, manifest == nil, model.state?.membershipActive == true, let client {
+        continueSetup = false
+        model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+      }
     }
     .onChange(of: privateNetwork.generation) { _, _ in
       if model.workServer?.network == .tailscale {

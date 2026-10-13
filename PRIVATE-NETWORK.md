@@ -6,12 +6,11 @@ Zenith uses the official TailscaleKit wrapper over libtailscale. The embedded us
 
 The UX and lifecycle review selected one Connection picker and one status/action row:
 
-1. Open **Work → Connection** (also available from **Wallet → Work access**).
-2. Enter the server's HTTPS address or import its public connection file.
-3. Choose **Direct** or **Private via Tailscale**. Selecting Private does not enroll or connect automatically.
-4. Tap **Connect Tailscale**. Sign in using the system browser and join the network supplied by the server administrator. Administrator device approval may still be required.
-5. **Check connection** sends an empty, credential-free probe to the closed read endpoint.
-6. Independently review the issuer public key and save the server, then review and approve its exact read permissions and expiry.
+1. Open **Work → Connection** (also available through **Wallet → Work access**).
+2. Tap **Connect to [server]** for a validated profile already in Zenith’s Documents folder. This explicit action starts private sign-in if needed. If there is no profile, **Choose connection file** and the in-app help explain how to obtain one; manual entry stays separate.
+3. Sign in using the system browser and join the network supplied by the server administrator. Administrator device approval may still be required. Simply importing a file or choosing a route in the manual form does not start networking.
+4. Return to **Continue to read access**. The public pin remains reviewable under server verification details. Saving the server can fetch a scope preview, but never grants access.
+5. Approve the exact read scope. Missing membership leads to Membership setup first. Connection checks and saved network management remain available afterward.
 
 A network connection is not a successful server probe, issuer verification or read authorization. No public/private host, tailnet name, reusable auth key or operator key is bundled. The official public Tailscale control plane is the only supported control plane in this preview. Headscale/custom control planes and multiple simultaneous networks are outside this change.
 

@@ -17,7 +17,7 @@ Updated October 13, 2026. Published native preview source. Generic server setup 
 | --- | --- |
 | Swift | Custody, QR, persistence, transport, anonymous connection checks and generic server settings covered |
 | Device package | Signed development builds; exact artifact/install results remain in local evidence |
-| Connection UI | Generic address entry, optional Tailscale guidance, independent issuer settings and explicit local confirmation |
+| Connection UI | On-device profile discovery, guided embedded Tailscale sign-in, read-scope review and separate manual setup |
 | Shared Wallet | Rust/native/WASM and JavaScript/typecheck source suites passed |
 | secS | 813 workspace tests passed, 1 ignored; separate shared read contract and parity checks passed |
 | Devgraph | Earlier full run: 2,642 passed, 5 skipped; exact release read integration: 20 passed; runtime/audit checks: 31 passed |
@@ -38,3 +38,9 @@ The new app is published at `ZenithResearch/zenith-ios`. Companion source is coo
 ## Embedded private connection — build 10
 
 Work connection now offers Direct or Private via Tailscale. The private route uses the official pinned TailscaleKit/libtailscale framework inside Zenith, with explicit sign-in and no direct fallback. Public server drafts survive wallet locking, and Connection remains available from the Work toolbar. Networking does not modify Rust custody, issuer trust, read grants or receiver policy. Native startup/sign-in cancellation was exercised in Simulator; actual phone enrollment and a private holder-bound read remain user-dependent qualification steps.
+
+## Guided connection and biometric unlock — build 12
+
+Validated public profiles in Zenith’s Documents folder appear as a Connect button. In-app instructions cover missing files, network login, and separate read approval. Optional Face ID/Touch ID saves the verified wallet password in a device-only, current-biometric-set Keychain item. The shared Rust custody and signing contracts remain unchanged; Swift adds lifecycle and identity checks around unlocking. Password AutoFill and ordinary password unlock remain available.
+
+43 Swift tests pass, including six added discovery/biometric-coordination tests. The real Keychain adapter builds in the signed iPhone app; synthetic storage tests are not qualification of physical Face ID. First device enrollment/unlock, biometric changes/lockout, and the end-to-end private read remain outstanding until exercised on-device.
