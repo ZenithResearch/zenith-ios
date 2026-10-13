@@ -39,6 +39,8 @@ final class WalletModel: ObservableObject {
   @Published var notice: String?
   @Published var obscured = false
   @Published var generation = 0
+  @Published private(set) var workServer: WorkAccessConfiguration?
+  private var workServerStore: WorkServerStore?
   private(set) var repository: WalletRepository?
   private var operation: Task<Void, Never>?
   init() {
@@ -47,11 +49,33 @@ final class WalletModel: ObservableObject {
         for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
       repository = try WalletRepository(
         directory: base.appendingPathComponent("CastaliaWallet", isDirectory: true))
+      workServerStore = try WorkServerStore(
+        directory: base.appendingPathComponent("WorkConnection", isDirectory: true))
+      workServer = try workServerStore?.load()
     } catch { self.error = "Wallet storage is unavailable. Reopen Zenith to try again." }
   }
   func load() async {
     guard let repository else { return }
     do { state = try await repository.state() } catch { self.error = error.localizedDescription }
+  }
+  func saveWorkServer(_ configuration: WorkAccessConfiguration?, completion: @escaping () -> Void) {
+    guard !busy, let store = workServerStore else { return }
+    let previous = workServer
+    perform({ repository in
+      // Never reuse authority from a removed configuration or an older bundled
+      // setup. Every newly selected server requires a fresh read approval.
+      for origin in Set([previous?.origin, configuration?.origin].compactMap({ $0 })) {
+        try await repository.forgetReadAccess(receiver: origin)
+      }
+    }) { _ in
+      do {
+        try store.save(configuration, replacing: previous)
+        self.workServer = configuration
+        self.generation += 1
+        self.notice = configuration == nil ? "Server removed from this device." : "Server saved. Review read access to connect."
+        completion()
+      } catch { self.error = "Could not save server settings. Any previous read access was disconnected; please reconnect after trying again." }
+    }
   }
   func perform<T>(
     _ action: @escaping (WalletRepository) async throws -> T, success: @escaping (T) -> Void

@@ -1,24 +1,39 @@
 import Foundation
 
-public struct ReadAuthorityPin: Codable, Sendable {
+public struct ReadAuthorityPin: Codable, Sendable, Hashable {
   public let issuer: String
   public let key_id: String
   public let public_key: String
   public let receiver: String
   public let audience: String
 }
-public struct WorkAccessConfiguration: Decodable, Sendable {
+public struct WorkAccessConfiguration: Codable, Sendable, Hashable {
   public let name: String
   public let receiver: URL
   public let issuer: String
   public let authority: ReadAuthorityPin
+  public let network: WorkNetwork?
+  public init(name: String, receiver: URL, issuer: String, keyID: String,
+    publicKey: String, network: WorkNetwork? = nil) throws {
+    self.name = name
+    self.receiver = receiver
+    self.issuer = issuer
+    self.network = network
+    let origin = receiver.absoluteString.hasSuffix("/")
+      ? String(receiver.absoluteString.dropLast()) : receiver.absoluteString
+    self.authority = ReadAuthorityPin(issuer: issuer, key_id: keyID,
+      public_key: publicKey, receiver: origin, audience: "devgraph")
+    try validate()
+  }
   public func validate() throws {
-    guard !name.isEmpty, name.count <= 80, !issuer.isEmpty, receiver.scheme == "https",
+    guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      name.count <= 80, !issuer.isEmpty, issuer.count <= 256, receiver.scheme == "https",
       receiver.host != nil,
       receiver.path.isEmpty || receiver.path == "/", receiver.query == nil,
       receiver.fragment == nil,
       receiver.user == nil, receiver.password == nil, authority.issuer == issuer,
       authority.receiver == origin, authority.audience == "devgraph", !authority.key_id.isEmpty,
+      authority.key_id.count <= 256,
       authority.public_key.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
     else { throw WalletFailure.core("service_setup_required") }
   }
@@ -107,7 +122,21 @@ public final class DevgraphReadClient: @unchecked Sendable {
     self.configuration = configuration
     self.transport = transport
   }
+  public var connection: WorkAccessConfiguration { configuration }
   public func cancel() { transport.cancel() }
+  /// A credential-free reachability check, not an authority or membership check.
+  public func checkConnection() async throws {
+    do { try await transport.checkReadReceiver(at: configuration.receiver) }
+    catch let error as URLError {
+      throw WorkConnectionFailure(code: error.code, network: configuration.network)
+    }
+  }
+  private func response(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
+    do { return try await transport.request(request, maximum: maximum) }
+    catch let error as URLError {
+      throw WorkConnectionFailure(code: error.code, network: configuration.network)
+    }
+  }
   private var now: UInt64 { UInt64(Date().timeIntervalSince1970) }
   private func request(path: String, body: Data? = nil) -> URLRequest {
     var request = URLRequest(url: URL(string: configuration.origin + path)!)
@@ -120,7 +149,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
   }
   public func prepare() async throws -> ReadAccessProposal {
     let identity = try await repository.readAccessIdentity()
-    let response = try await transport.request(
+    let response = try await response(
       request(path: "/devgraph/native-read/v2/challenges", body: identity), maximum: 16_384)
     let v = try object(response)
     try exact(
@@ -192,7 +221,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     let approved = try await repository.approveReadCredential(
       proposal.challenge, pin: configuration.authority, now: now)
     try repository.checkLifecycle(ticket)
-    let response = try await transport.request(
+    let response = try await response(
       request(path: "/devgraph/native-read/v2/enrollments", body: approved), maximum: 65_536)
     let v = try object(response)
     try exact(v, ["schema", "credential", "manifest"])
@@ -233,7 +262,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     let proof = try await repository.signReadCall(receiver: configuration.origin,
       call: JSONSerialization.data(withJSONObject: read), now: now)
     try repository.checkLifecycle(ticket)
-    let data = try await transport.request(request(path: "/devgraph/native-read/v2/requests", body: proof))
+    let data = try await response(request(path: "/devgraph/native-read/v2/requests", body: proof))
     try repository.checkLifecycle(ticket)
     struct Page: Decodable { let items: [WorkRecord] }
     let page = try JSONDecoder().decode(Page.self, from: data)

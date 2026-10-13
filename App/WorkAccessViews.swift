@@ -3,15 +3,14 @@ import ZenithKit
 
 @MainActor
 func workClient(_ model: WalletModel) -> DevgraphReadClient? {
-  guard let url = Bundle.main.url(forResource: "WorkAccess", withExtension: "json"),
-    let data = try? Data(contentsOf: url), data.count <= 65_536,
-    let configuration = try? JSONDecoder().decode(WorkAccessConfiguration.self, from: data),
+  guard let configuration = model.workServer,
     let repository = model.repository
   else { return nil }
   return try? DevgraphReadClient(repository: repository, configuration: configuration)
 }
 struct WorkAccessView: View {
   @EnvironmentObject private var model: WalletModel
+  @Environment(\.colorScheme) private var colorScheme
   @State private var client: DevgraphReadClient?
   @State private var proposal: ReadAccessProposal?
   @State private var current: NativeReadManifest?
@@ -19,6 +18,7 @@ struct WorkAccessView: View {
     Group {
       if let client {
         Form {
+          WorkConnectionSection(configuration: client.connection, busy: model.busy).id(model.generation)
           if let proposal {
             Section("Read-only access") {
               LabeledContent("Provider", value: proposal.issuer)
@@ -49,7 +49,8 @@ struct WorkAccessView: View {
                   self.proposal = nil
                   model.notice = "Read-only access saved. Open Work to read your items."
                 }
-              }.buttonStyle(.borderedProminent).disabled(model.busy)
+              }.buttonStyle(.borderedProminent)
+                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(model.busy)
               Button("Cancel") {
                 client.cancel()
                 model.cancel()
@@ -85,15 +86,29 @@ struct WorkAccessView: View {
               Text("Review the permitted work and expiry before connecting.")
               Button("Review work access") {
                 model.perform({ _ in try await client.prepare() }) { proposal = $0 }
-              }.buttonStyle(.borderedProminent).disabled(model.busy)
+              }.buttonStyle(.borderedProminent)
+                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(model.busy)
             }
+          }
+          Section {
+            Button("Remove server", role: .destructive) {
+              client.cancel()
+              model.saveWorkServer(nil) {}
+            }.disabled(model.busy)
+          } footer: {
+            Text("Removes this device’s server settings and read access. Your wallet and server data stay intact.")
           }
           Section { Feedback() }
         }.navigationTitle("Work access")
       } else {
-        SetupInformation(kind: .work)
+        WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
+          model.saveWorkServer(configuration) {}
+        }
       }
-    }.task {
+    }.task(id: model.workServer) {
+      client?.cancel()
+      proposal = nil
+      current = nil
       client = workClient(model)
       current = try? await client?.manifest()
     }
@@ -133,8 +148,11 @@ struct NativeWorkView: View {
           if let error {
             Text(error)
           } else {
-            Text("Connect read-only work access in Wallet to see your items.")
+            Text("Connect read-only work access to see your items.")
           }
+        }
+        if rows.isEmpty && !loading {
+          NavigationLink("Set up work connection") { WorkAccessView() }
         }
         ForEach(visible, id: \.rowID) { row in
           NavigationLink {
@@ -172,7 +190,13 @@ struct NativeWorkView: View {
             }.navigationTitle("Filters").toolbar { Button("Done") { filters = false } }
           }
         }
-        .task {
+        .task(id: model.workServer) {
+          client?.cancel()
+          rows = []
+          cursors = [:]
+          finished = []
+          allowed = []
+          error = nil
           client = workClient(model)
           do {
             if let manifest = try await client?.manifest() {

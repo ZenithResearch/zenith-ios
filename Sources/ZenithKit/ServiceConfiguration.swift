@@ -66,11 +66,38 @@ public final class PrivateTransport: @unchecked Sendable {
     configuration.urlCache = nil
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
     configuration.timeoutIntervalForRequest = 20
+    configuration.timeoutIntervalForResource = 30
     session = URLSession(
       configuration: configuration, delegate: RedirectBlocker(), delegateQueue: nil)
   }
   deinit { session.invalidateAndCancel() }
   public func cancel() { session.getAllTasks { tasks in tasks.forEach { $0.cancel() } } }
+  /// Exercise only the closed read endpoint with an empty body. A 401 with the
+  /// expected bounded error demonstrates reachability, never authorization.
+  public func checkReadReceiver(at origin: URL) async throws {
+    guard origin.scheme == "https", origin.host != nil,
+      origin.user == nil, origin.password == nil, origin.query == nil,
+      origin.fragment == nil, origin.path.isEmpty || origin.path == "/"
+    else { throw WalletFailure.core("service_setup_required") }
+    let url = origin.appendingPathComponent("devgraph/native-read/v2/requests")
+    var request = URLRequest(url: url, timeoutInterval: 8)
+    request.httpMethod = "POST"
+    request.httpBody = Data("{}".utf8)
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    let (bytes, response) = try await session.bytes(for: request)
+    guard let response = response as? HTTPURLResponse,
+      response.url == url, response.statusCode == 401,
+      response.expectedContentLength <= 1024
+    else { throw WalletFailure.core("service_rejected_request") }
+    var data = Data()
+    for try await byte in bytes {
+      guard data.count < 1024 else { throw WalletFailure.invalidFile }
+      data.append(byte)
+    }
+    guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+      value == ["error": "access_denied"]
+    else { throw WalletFailure.core("invalid_response") }
+  }
   public func request(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
     guard request.url?.scheme == "https", request.url?.user == nil, request.url?.password == nil
     else { throw WalletFailure.core("service_setup_required") }

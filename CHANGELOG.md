@@ -2,9 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Add generic, device-local Work server setup with HTTPS address entry, optional Tailscale guidance, an anonymous connection check, and reviewed public issuer settings. Exclude Work configuration from builds; require explicit setup and fresh read approval after upgrading from a bundled preview. Development build 9.
+
+
 ### Changed
 
-- Record the approved private read deployment and current device qualification boundary — distinguish a running service from a completed phone read or general release.
+- Separate source qualification from installation-specific evidence; keep deployment settings and live device details out of public documentation.
 
 ### Added
 

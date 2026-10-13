@@ -2,7 +2,7 @@
 
 A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
 
-Status: published source, source checks passed, and signed build 7 installed on an operator-approved iPhone. The dedicated read receiver is live; the phone’s first approved enrollment/read is still pending. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
+Status: native preview with source checks and signed device builds. Work server setup is generic and stored only on the user's device; no deployment endpoint is built in. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
 
 ## Build
 
@@ -64,17 +64,22 @@ Each page has one next action. Alternative transfer methods are secondary; after
 
 ## Configuration and consent
 
-An unconfigured build intentionally offers setup-required states. Do not paste a local owner credential into the app or ship a test trust root.
+In **Wallet → Work access**, enter a Devgraph HTTPS origin or import a connection file from the server administrator. An optional **Uses Tailscale** setting displays generic guidance for the separate Tailscale app. No hostname, network, issuer key or private deployment default is built in. The connection check sends only `{}` to the closed read endpoint, with no identity or credential; a successful check establishes reachability only.
 
-A distributor may supply **public proposed configuration** as `App/Membership.json` and `App/WorkAccess.json`, then regenerate the Xcode project. Loading either file does not approve it. The member must review and approve trust and read access in Wallet. Keep installation-specific configuration out of source control; record its public digest with the release evidence.
+The server administrator supplies the issuer's public verification settings separately from enrollment. Import the JSON shape below, or enter its public issuer/key fields under **Enter settings manually**. Confirm the server and public key on **Review server**, then choose **Use this server**. Saving settings does not grant access. Membership and the exact read scopes still require separate approval. Never paste an owner credential, private key or password into server setup.
 
-`Membership.json` has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
+Settings stay in OS-protected Application Support, excluded from backups. Removing a server disconnects its local read authority. Adding a server always requires a fresh read approval, including when returning to a previously used address. A different issuer pin is never learned from an enrollment response. Builds exclude `App/WorkAccess.json`, even if someone has left an ignored copy locally. Existing preview users must explicitly set up their server after upgrading; prior bundled settings are not silently migrated.
+
+A distributor may supply a **public proposed membership configuration** as `App/Membership.json`. It requires local approval and is separate from Work server setup. It has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
+
+Example administrator-provided Work connection file (placeholders only):
 
 ```json
 {
   "name": "Zenith work",
   "receiver": "https://your-approved-receiver.example",
   "issuer": "your-approved-issuer",
+  "network": "tailscale",
   "authority": {
     "issuer": "your-approved-issuer",
     "key_id": "your-approved-key-id",
@@ -85,7 +90,7 @@ A distributor may supply **public proposed configuration** as `App/Membership.js
 }
 ```
 
-The example is the shape of `WorkAccess.json`, not an enabled service. The public Devgraph candidate exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access. The native app displays the exact server, issuer, work scopes, archive visibility, and expiry before approval.
+The optional `network` hint never activates a VPN or changes the issuer pin. Omit it for ordinary HTTPS. Connection files reject unknown fields, credential material, mismatched receiver/issuer values and unsupported networks. They are limited to 16 KiB. The public Devgraph receiver exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access.
 
 The issuer public key must be supplied independently of the enrollment response. The shared Rust core validates the signed credential and signs a fresh holder proof for each read. Old bearer-only Work configurations fail setup.
 
