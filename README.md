@@ -1,8 +1,8 @@
 # Zenith iOS preview
 
-A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap without changing the existing iOS app, phone website, live identities, trust, grants, or graph.
+A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
 
-Status: source implementation and Simulator build; **not a qualified release**. See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
+Status: published source, source checks passed, and signed build 7 installed on an operator-approved iPhone. The dedicated read receiver is live; the phone’s first approved enrollment/read is still pending. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
 
 ## Build
 

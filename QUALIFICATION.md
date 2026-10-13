@@ -4,7 +4,7 @@ Run against disposable identities, approved test trust, isolated receiver storag
 
 ## Source checks
 
-The evidence manifest records commands, versions, source/artifact hashes, and log hashes. Its repository revisions are base revisions plus candidate file digests; they are not claims that uncommitted work is published.
+The evidence manifest records commands, versions, source/artifact hashes, and log hashes. `Dependencies.json` now pins the published Wallet commit; release evidence records exact source and packaged artifact hashes. Older evidence using candidate file digests does not qualify a newer package.
 
 - Wallet: `cargo test --workspace --locked --offline`, `cargo fmt --all -- --check`, `npm test`, `npm run typecheck`. Public v3/v4 fixtures exercise preserved signing transcripts; portable validation rejects wrong owners, signatures, descriptors, authority injection, and unknown fields.
 - Native: `scripts/build-core.sh`, `swift test`, Xcode Simulator build. Swift tests exercise actual Rust custody, durable storage, stale/cancelled previews, HTTPS/redirect handling, bounded responses and unsupported grants.
@@ -39,6 +39,8 @@ Use an isolated test identity for destructive clean-install steps; do not erase 
 
 Five people unfamiliar with implementation try create/check, restore, connect and read. At least four complete each assigned journey without coaching. Everyone must understand that access is read-only and data alone cannot restore signing identity. Record confusion, changes and retests. A technical source review or prototype review is not this usability evidence.
 
-## Live activation — excluded
+## Operator-authorized live read activation — October 13, 2026
 
-No production trust, memberships, credentials, grants, migrations, data, server routing or deployment are changed. A developer signing team, physical device, approved distributor configuration, and separate rollout decision are still required.
+The operator authorized a dedicated read issuer and private Tailscale receiver. Devgraph `3eea919`, secS `109c0be`, and Wallet `f654017` supply the installed path. Build 7 is signed and installed as an update, preserving the existing phone wallet. The approved policy is list/get only, all Arenas, unarchived concrete Work, and a one-hour credential. The main API remains healthy; unsigned requests to the new private HTTPS route return 401.
+
+The phone must separately approve membership and the disclosed read connection. That first physical enrollment/read is still pending. Activation does not count as completing the destructive/disposable qualification matrix above, the broader mutation-signing chain, or App Store distribution. No graph migration or Work mutation was performed. Operator configurations, credential registries, keys, and local device evidence are excluded from this repository.

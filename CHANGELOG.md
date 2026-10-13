@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Record the approved private read deployment and current device qualification boundary — distinguish a running service from a completed phone read or general release.
+
 ### Added
 
 - Pin shared Wallet build inputs and verify holder-bound read credentials for each Work request — let the native app connect to an explicitly approved issuer without an owner bearer.
