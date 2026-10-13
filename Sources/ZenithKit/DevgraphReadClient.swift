@@ -115,12 +115,13 @@ public final class DevgraphReadClient: @unchecked Sendable {
   let transport: PrivateTransport
   public init(
     repository: WalletRepository, configuration: WorkAccessConfiguration,
-    transport: PrivateTransport = PrivateTransport()
+    transport: PrivateTransport? = nil
   ) throws {
     try configuration.validate()
     self.repository = repository
     self.configuration = configuration
-    self.transport = transport
+    guard configuration.network != .tailscale || transport != nil else { throw PrivateNetworkError.disconnected }
+    self.transport = transport ?? PrivateTransport()
   }
   public var connection: WorkAccessConfiguration { configuration }
   public func cancel() { transport.cancel() }

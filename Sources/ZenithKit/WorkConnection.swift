@@ -1,6 +1,6 @@
 import Foundation
 
-/// Distributor-supplied connection guidance. It never installs a VPN or grants access.
+/// User-selected route. Private networking never grants Work authority.
 public enum WorkNetwork: String, Codable, Sendable, Hashable {
   case tailscale
 }
@@ -20,7 +20,7 @@ public struct WorkConnectionFailure: LocalizedError, Sendable {
     }
     if code == .cancelled { return "Connection cancelled." }
     if network == .tailscale {
-      return "Can’t reach your work server. Open Tailscale, connect to the same network as your server, then try again."
+      return "Can’t reach your work server through Tailscale. Check the private connection and server address, then try again."
     }
     return "Can’t reach your work server. Check your internet connection and try again."
   }

@@ -34,3 +34,7 @@ The five-person simplicity study, independent custody review and App Store/TestF
 ## Delivery boundaries
 
 The new app is published at `ZenithResearch/zenith-ios`. Companion source is coordinated through Wallet #32, public Devgraph #10 and secS #298. The private Devgraph archive is not a dependency. Server setup requires no graph migration, Work mutation, wallet replacement or owner-credential forwarding. Unrelated Web, Wallet preview, and Devgraph maintenance work remains preserved in its own checkout.
+
+## Embedded private connection — build 10
+
+Work connection now offers Direct or Private via Tailscale. The private route uses the official pinned TailscaleKit/libtailscale framework inside Zenith, with explicit sign-in and no direct fallback. Public server drafts survive wallet locking, and Connection remains available from the Work toolbar. Networking does not modify Rust custody, issuer trust, read grants or receiver policy. Native startup/sign-in cancellation was exercised in Simulator; actual phone enrollment and a private holder-bound read remain user-dependent qualification steps.

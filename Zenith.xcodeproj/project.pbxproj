@@ -9,10 +9,15 @@
 /* Begin PBXBuildFile section */
 		08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */; };
 		14222823819B4E0D23FD043A /* PortableViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */; };
+		1670ECD86E55A71E82A90210 /* Tailscale-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = C954996205ACC40099CF7808 /* Tailscale-LICENSE.txt */; };
 		1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */; };
+		2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */; };
 		3B5B02EF4F979FBEC6FE6329 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816148DAF0ACAFA83EE9439E /* RootView.swift */; };
 		45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A991E568D963A960C0F62136 /* WorkConnectionSection.swift */; };
+		49F7F67AE5F4BE68E71AA6A0 /* TailscaleDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */; };
+		4DDB84468536881BD449B3BB /* TailscaleKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */ = {isa = PBXBuildFile; fileRef = 3E750ECFD3FF478351FC7691 /* Membership.json */; };
+		58458AC95679375C5492881B /* TailscaleKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */; };
 		587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */ = {isa = PBXBuildFile; productRef = 77F0D4105983A0787AFCCF72 /* ZenithKit */; };
 		5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */; };
 		66C54D034B9239C28919B21D /* ImportWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */; };
@@ -25,7 +30,23 @@
 		A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */; };
 		CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */; };
 		DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */; };
+		EF345F79289867DB2FDF5D35 /* PrivateNetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */; };
+		FF439BAE64F19AFFE654BD25 /* Tailscale-dependencies.txt in Resources */ = {isa = PBXBuildFile; fileRef = 87B36526577727B84F5CB335 /* Tailscale-dependencies.txt */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4191F927CA631AA4B8B03021 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				4DDB84468536881BD449B3BB /* TailscaleKit.xcframework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryViews.swift; sourceTree = "<group>"; };
@@ -35,14 +56,20 @@
 		3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletPresentation-MIT.txt"; sourceTree = "<group>"; };
 		3E750ECFD3FF478351FC7691 /* Membership.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Membership.json; sourceTree = "<group>"; };
 		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateNetworkView.swift; sourceTree = "<group>"; };
 		58F28FE66495D39285938EBB /* CreateWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateWalletFlow.swift; sourceTree = "<group>"; };
+		5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleDriver.swift; sourceTree = "<group>"; };
+		79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkServerDraft.swift; sourceTree = "<group>"; };
 		7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkServerSetupView.swift; sourceTree = "<group>"; };
 		7FB49E98557EFB75CC85CFA3 /* zenith-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "zenith-ios"; path = .; sourceTree = SOURCE_ROOT; };
 		816148DAF0ACAFA83EE9439E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		87B36526577727B84F5CB335 /* Tailscale-dependencies.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Tailscale-dependencies.txt"; sourceTree = "<group>"; };
+		8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TailscaleKit.xcframework; path = Artifacts/TailscaleKit.xcframework; sourceTree = "<group>"; };
 		996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportWalletFlow.swift; sourceTree = "<group>"; };
 		A991E568D963A960C0F62136 /* WorkConnectionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkConnectionSection.swift; sourceTree = "<group>"; };
 		B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableViews.swift; sourceTree = "<group>"; };
 		BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenithApp.swift; sourceTree = "<group>"; };
+		C954996205ACC40099CF7808 /* Tailscale-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Tailscale-LICENSE.txt"; sourceTree = "<group>"; };
 		E4D471A1EAA463D3861BCF7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupWalletFlow.swift; sourceTree = "<group>"; };
 		E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkAccessViews.swift; sourceTree = "<group>"; };
@@ -56,6 +83,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */,
+				58458AC95679375C5492881B /* TailscaleKit.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -67,8 +95,35 @@
 			children = (
 				F5F56BAF4CAF4DEFA278E552 /* App */,
 				F26A81E05E920BD19EE16246 /* Packages */,
+				4AF6D901FA894C1E418F72AB /* Frameworks */,
 				B09EF9F6E1B8554DB3619CAE /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		2109CA32B1C4A48F640EE127 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */,
+				5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		4A96C5D1892DB5D0DBA7C2D0 /* Notices */ = {
+			isa = PBXGroup;
+			children = (
+				87B36526577727B84F5CB335 /* Tailscale-dependencies.txt */,
+				C954996205ACC40099CF7808 /* Tailscale-LICENSE.txt */,
+			);
+			path = Notices;
+			sourceTree = "<group>";
+		};
+		4AF6D901FA894C1E418F72AB /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		7652DC118BA843986EE7F0DE /* Licenses */ = {
@@ -113,9 +168,12 @@
 				1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */,
 				E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */,
 				A991E568D963A960C0F62136 /* WorkConnectionSection.swift */,
+				79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */,
 				7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */,
 				BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */,
 				7652DC118BA843986EE7F0DE /* Licenses */,
+				2109CA32B1C4A48F640EE127 /* Networking */,
+				4A96C5D1892DB5D0DBA7C2D0 /* Notices */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -130,6 +188,7 @@
 				7C6275036623F1EBCE9939E5 /* Sources */,
 				7838D1BEA581C6F8855E51A7 /* Resources */,
 				ACF62A7863250A3272C1DF4F /* Frameworks */,
+				4191F927CA631AA4B8B03021 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -184,6 +243,8 @@
 				9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */,
 				DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */,
 				544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */,
+				1670ECD86E55A71E82A90210 /* Tailscale-LICENSE.txt in Resources */,
+				FF439BAE64F19AFFE654BD25 /* Tailscale-dependencies.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,13 +260,16 @@
 				66C54D034B9239C28919B21D /* ImportWalletFlow.swift in Sources */,
 				9F860EF22BD635C6F5FBD94D /* MembershipView.swift in Sources */,
 				14222823819B4E0D23FD043A /* PortableViews.swift in Sources */,
+				EF345F79289867DB2FDF5D35 /* PrivateNetworkView.swift in Sources */,
 				CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */,
 				5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */,
 				3B5B02EF4F979FBEC6FE6329 /* RootView.swift in Sources */,
+				49F7F67AE5F4BE68E71AA6A0 /* TailscaleDriver.swift in Sources */,
 				8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */,
 				8CCB3A40301BE61DB5E12030 /* WalletFlowComponents.swift in Sources */,
 				A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */,
 				45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */,
+				2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */,
 				77426BE1161C6AD8936723D2 /* WorkServerSetupView.swift in Sources */,
 				1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */,
 			);
@@ -262,7 +326,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -278,7 +342,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Artifacts\"",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Zenith;
@@ -301,7 +369,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"Artifacts\"",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Zenith;
@@ -373,7 +445,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

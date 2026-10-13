@@ -13,5 +13,14 @@
     "credential": "castalia.read-credential.v1",
     "presentation": "castalia.read-presentation.v1",
     "transport": "devgraph.native-read.v2"
+  },
+  "tailscale": {
+    "repository": "https://github.com/tailscale/libtailscale",
+    "revision": "258321b9f7354b150488953f7a47918a5eb4b96b",
+    "tailscale_version": "v1.104.1",
+    "go_version": "go1.27.2",
+    "go_darwin_arm64_sha256": "76812b213b1b2302c978d28fa52fa92d541704b9e7d9d5db8002c50e4018c4c5",
+    "patch": "scripts/patches/libtailscale-private-logging.patch",
+    "minimum_ios": "18.1"
   }
 }

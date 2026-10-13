@@ -6,11 +6,13 @@ Status: native preview with source checks and signed device builds. Work server 
 
 ## Build
 
-Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. Minimum iOS is 17; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
+Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. The embedded TailscaleKit build requires iOS 18.1 or later; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 scripts/build-core.sh /absolute/path/to/castalia-wallet
+# With the pinned Go 1.27.2 toolchain on PATH:
+scripts/build-tailscale.sh
 xcodegen generate
 swift test
 xcodebuild -project Zenith.xcodeproj -scheme Zenith \
@@ -64,7 +66,7 @@ Each page has one next action. Alternative transfer methods are secondary; after
 
 ## Configuration and consent
 
-In **Wallet → Work access**, enter a Devgraph HTTPS origin or import a connection file from the server administrator. An optional **Uses Tailscale** setting displays generic guidance for the separate Tailscale app. No hostname, network, issuer key or private deployment default is built in. The connection check sends only `{}` to the closed read endpoint, with no identity or credential; a successful check establishes reachability only.
+In **Wallet → Work access**, enter a Devgraph HTTPS origin or import a connection file from the server administrator. Choose **Direct** or **Private via Tailscale**. Private uses the embedded TailscaleKit connection; tap **Connect Tailscale** to sign in through the system browser. No separate Tailscale app is needed. The persistent **Work → Connection** entry manages the network and saved server. No hostname, network, issuer key or private deployment default is built in. The connection check sends only `{}` to the closed read endpoint, with no identity or credential; a successful check establishes reachability only.
 
 The server administrator supplies the issuer's public verification settings separately from enrollment. Import the JSON shape below, or enter its public issuer/key fields under **Enter settings manually**. Confirm the server and public key on **Review server**, then choose **Use this server**. Saving settings does not grant access. Membership and the exact read scopes still require separate approval. Never paste an owner credential, private key or password into server setup.
 
@@ -90,11 +92,11 @@ Example administrator-provided Work connection file (placeholders only):
 }
 ```
 
-The optional `network` hint never activates a VPN or changes the issuer pin. Omit it for ordinary HTTPS. Connection files reject unknown fields, credential material, mismatched receiver/issuer values and unsupported networks. They are limited to 16 KiB. The public Devgraph receiver exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access.
+The optional `network: "tailscale"` now selects an enforced embedded route. Existing files remain readable, but require explicit connection in Zenith; merely importing a file never signs in. Omit it for direct HTTPS. There is no fallback from Private to Direct. Connection files reject unknown fields, credential material, mismatched receiver/issuer values and unsupported networks. They are limited to 16 KiB. The public Devgraph receiver exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access.
 
 The issuer public key must be supplied independently of the enrollment response. The shared Rust core validates the signed credential and signs a fresh holder proof for each read. Old bearer-only Work configurations fail setup.
 
-Read credentials are encrypted in the local snapshot and excluded from portable backups. URLSession is ephemeral, uses HTTPS, has no cookie/cache storage, rejects redirects, and bounds responses. Disconnect removes local access; server-side installation revocation is a separate operator action. No mutation client is included.
+Read credentials are encrypted in the local snapshot and excluded from portable backups. URLSession is ephemeral, uses HTTPS, has no cookie/cache storage, rejects redirects, and bounds responses. **Remove read access** removes local authorization; **Disconnect Tailscale** only pauses networking; server-side installation revocation is a separate operator action. No mutation client is included.
 
 ## Custody and transaction boundaries
 
@@ -116,3 +118,7 @@ The shared core remains application-neutral. Its internal recovery/read-approval
 ## Licensing direction
 
 AGPL is the preferred direction for a future licensing review, as noted on October 12, 2026. This is not yet a relicensing decision: the AGPL version and affected repositories/crates remain to be confirmed. The previously approved MIT declarations remain current. Any migration should coordinate the native app, shared Wallet crates, public Web source snapshot, license notices, provenance and license checks so their declarations stay consistent.
+
+## Embedded private networking
+
+See [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) for the UX, lifecycle and qualification boundaries. TailscaleKit wraps pinned libtailscale and is confined to `App/Networking`; Wallet custody and signing still use the unchanged shared Rust core. `Dependencies.json`, the checked privacy patch and `Artifacts/tailscale-build.json` identify the native framework. No tailnet name, reusable join key, private hostname or operator issuer pin is bundled.

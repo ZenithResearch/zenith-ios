@@ -6,10 +6,12 @@ func workClient(_ model: WalletModel) -> DevgraphReadClient? {
   guard let configuration = model.workServer,
     let repository = model.repository
   else { return nil }
-  return try? DevgraphReadClient(repository: repository, configuration: configuration)
+  let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : PrivateTransport()
+  return try? DevgraphReadClient(repository: repository, configuration: configuration, transport: transport)
 }
 struct WorkAccessView: View {
   @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @Environment(\.colorScheme) private var colorScheme
   @State private var client: DevgraphReadClient?
   @State private var proposal: ReadAccessProposal?
@@ -40,7 +42,7 @@ struct WorkAccessView: View {
               }
             }
             Section {
-              Button("Connect read-only access") {
+              Button("Allow read-only access") {
                 model.perform({ _ in
                   try await client.connect(proposal)
                   return try await client.manifest()
@@ -66,7 +68,7 @@ struct WorkAccessView: View {
                 value: Date(timeIntervalSince1970: Double(current.expires_at)).formatted())
             }
             Section {
-              Button("Disconnect this device") {
+              Button("Remove read access") {
                 model.perform({ _ in try await client.disconnect() }) { _ in
                   self.current = nil
                   model.notice = "Work access removed from this device."
@@ -105,17 +107,22 @@ struct WorkAccessView: View {
           model.saveWorkServer(configuration) {}
         }
       }
-    }.task(id: model.workServer) {
+    }.task(id: model.generation) {
       client?.cancel()
       proposal = nil
       current = nil
       client = workClient(model)
-      current = try? await client?.manifest()
+      let version = model.generation
+      let manifest = try? await client?.manifest()
+      guard !Task.isCancelled, version == model.generation else { return }
+      current = manifest
     }
-    .onChange(of: model.generation) { _, _ in
-      client?.cancel()
-      proposal = nil
-      current = nil
+    .onChange(of: privateNetwork.generation) { _, _ in
+      if model.workServer?.network == .tailscale {
+        client?.cancel()
+        proposal = nil
+        model.cancel()
+      }
     }
     .onDisappear {
       client?.cancel()
@@ -125,6 +132,7 @@ struct WorkAccessView: View {
 }
 struct NativeWorkView: View {
   @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @State private var client: DevgraphReadClient?
   @State private var rows: [WorkRecord] = []
   @State private var cursors: [String: String] = [:]
@@ -133,6 +141,8 @@ struct NativeWorkView: View {
   @State private var error: String?
   @State private var loading = false
   @State private var filters = false
+  @State private var connection = false
+  @EnvironmentObject private var draft: WorkServerDraft
   @State private var search = ""
   @AppStorage("workKindFilter") private var kind = "All types"
   private var visible: [WorkRecord] {
@@ -179,7 +189,21 @@ struct NativeWorkView: View {
         if !rows.isEmpty, let error { Text(error) }
       }.navigationTitle("Work")
         .searchable(text: $search, prompt: "Search loaded work")
-        .toolbar { Button("Filters", systemImage: "line.3.horizontal.decrease") { filters = true } }
+        .refreshable {
+          rows = []; cursors = [:]; finished = []
+          await loadMore()
+        }
+        .toolbar {
+          ToolbarItem(placement: .topBarLeading) {
+            Button("Connection", systemImage: "network") { connection = true }
+              .accessibilityIdentifier("work.connection.settings")
+          }
+          ToolbarItem(placement: .topBarTrailing) {
+            Button("Filters", systemImage: "line.3.horizontal.decrease") { filters = true }
+          }
+        }
+        .navigationDestination(isPresented: $connection) { WorkAccessView() }
+        .onAppear { if draft.active { connection = true } }
         .sheet(isPresented: $filters) {
           NavigationStack {
             Form {
@@ -190,7 +214,7 @@ struct NativeWorkView: View {
             }.navigationTitle("Filters").toolbar { Button("Done") { filters = false } }
           }
         }
-        .task(id: model.workServer) {
+        .task(id: model.generation) {
           client?.cancel()
           rows = []
           cursors = [:]
@@ -198,8 +222,11 @@ struct NativeWorkView: View {
           allowed = []
           error = nil
           client = workClient(model)
+          loading = false
+          let version = model.generation
           do {
             if let manifest = try await client?.manifest() {
+              guard !Task.isCancelled, version == model.generation else { return }
               allowed = Array(
                 Set(
                   manifest.read_grants.filter { $0.operations.contains("list") }.flatMap(
@@ -209,18 +236,23 @@ struct NativeWorkView: View {
               if rows.isEmpty { await loadMore() }
             }
           } catch {
+            guard !Task.isCancelled, version == model.generation else { return }
             self.error = "Work access needs setup or has expired. Open Work access in Wallet."
           }
         }
     }
-    .onChange(of: model.generation) { _, _ in
-      client?.cancel()
-      rows = []
-      cursors = [:]
-      finished = []
-      allowed = []
-      error = nil
-      loading = false
+    .onChange(of: privateNetwork.phase) { _, phase in
+      if phase == .connected, model.workServer?.network == .tailscale {
+        Task { await loadMore() }
+      }
+    }
+    .onChange(of: privateNetwork.generation) { _, _ in
+      if model.workServer?.network == .tailscale {
+        client?.cancel()
+        rows = []; cursors = [:]; finished = []
+        loading = false
+        error = "Private connection changed. Open Connection to reconnect."
+      }
     }
     .onDisappear { client?.cancel() }
   }
@@ -229,11 +261,16 @@ struct NativeWorkView: View {
     loading = true
     error = nil
     let version = model.generation
-    defer { if version == model.generation { loading = false } }
+    let usesPrivateNetwork = client.connection.network == .tailscale
+    let networkVersion = privateNetwork.generation
+    func current() -> Bool {
+      version == model.generation && (!usesPrivateNetwork || networkVersion == privateNetwork.generation)
+    }
+    defer { if current() { loading = false } }
     do {
       for type in allowed where !finished.contains(type) {
         let page = try await client.list(kind: type, after: cursors[type])
-        guard version == model.generation else { return }
+        guard current(), !Task.isCancelled else { return }
         if page.count < 20 { finished.insert(type) }
         if let last = page.last {
           guard last.id != cursors[type] else { throw WalletFailure.core("invalid_response") }
@@ -243,7 +280,7 @@ struct NativeWorkView: View {
         rows.append(contentsOf: page.filter { !existing.contains($0.rowID) })
       }
     } catch {
-      if version == model.generation {
+      if current() {
         if let failure = error as? WalletFailure,
           failure == .core("access_denied") || failure == .core("access_expired")
         {

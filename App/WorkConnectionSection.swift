@@ -9,20 +9,9 @@ struct WorkConnectionSection: View {
       Text(configuration.name).font(.headline)
       Text(configuration.origin).font(.footnote).foregroundStyle(.secondary)
         .textSelection(.enabled)
-      if configuration.network == .tailscale { TailscaleSetupRows() }
+      if configuration.network == .tailscale { PrivateNetworkRow() }
       WorkConnectionCheck(receiver: configuration.receiver, network: configuration.network, busy: busy)
     }
-  }
-}
-
-struct TailscaleSetupRows: View {
-  var body: some View {
-    DisclosureGroup("Tailscale setup") {
-      Text("This server uses a private network. Connect in the separate Tailscale app before continuing.")
-      Link("Get Tailscale", destination: URL(string: "https://apps.apple.com/app/tailscale/id1470499037")!)
-      Text("Sign in to the same network as your work server and turn the connection on. Ask your server administrator which network to use.")
-      Text("Return to Zenith, unlock your wallet if asked, and check the connection.")
-    }.font(.subheadline)
   }
 }
 
@@ -31,6 +20,7 @@ struct WorkConnectionCheck: View {
   let receiver: URL
   let network: WorkNetwork?
   var busy = false
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @Environment(\.scenePhase) private var scene
   @State private var checkTask: Task<Void, Never>?
   @State private var checking = false
@@ -53,6 +43,7 @@ struct WorkConnectionCheck: View {
       .onChange(of: scene) { _, phase in if phase != .active { reset() } }
       .onChange(of: receiver) { _, _ in reset() }
       .onChange(of: network) { _, _ in reset() }
+      .onChange(of: privateNetwork.generation) { _, _ in reset() }
       .onDisappear { reset() }
   }
   private func reset() {
@@ -69,12 +60,15 @@ struct WorkConnectionCheck: View {
     checking = true
     checkTask = Task { @MainActor in
       do {
-        try await PrivateTransport().checkReadReceiver(at: receiver)
+        let transport = network == .tailscale ? privateNetwork.transport() : PrivateTransport()
+        try await transport.checkReadReceiver(at: receiver)
         guard !Task.isCancelled else { return }
         reachable = true
       } catch {
         guard !Task.isCancelled else { return }
-        if let error = error as? URLError {
+        if let error = error as? PrivateNetworkError {
+          failure = error.localizedDescription
+        } else if let error = error as? URLError {
           failure = WorkConnectionFailure(code: error.code, network: network).localizedDescription
         } else {
           failure = "This address did not return a supported Devgraph response. Check the address with your server administrator."

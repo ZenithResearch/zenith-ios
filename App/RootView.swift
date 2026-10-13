@@ -37,6 +37,7 @@ struct RootView: View {
       }
     }.onChange(of: model.state?.unlocked) { _, unlocked in
       if unlocked == true && model.state?.backupVerified != true { destination = "wallet" }
+      else if unlocked == true && model.workDraft.active { destination = "work" }
     }
   }
 }

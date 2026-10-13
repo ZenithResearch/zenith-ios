@@ -8,6 +8,8 @@ struct ZenithApp: App {
   var body: some Scene {
     WindowGroup {
       RootView().environmentObject(model)
+        .environmentObject(model.workDraft)
+        .environmentObject(model.privateNetwork)
         .tint(Color(uiColor: UIColor { traits in
           traits.userInterfaceStyle == .dark
             ? UIColor(red: 0.47, green: 0.91, blue: 0.78, alpha: 1)
@@ -16,6 +18,7 @@ struct ZenithApp: App {
         .task { await model.load() }
         .onChange(of: scene) { _, phase in
           if phase == .background { model.suspend() }
+          if phase == .active { model.privateNetwork.resume() }
           model.obscured = phase != .active
         }
         .onReceive(
@@ -28,6 +31,8 @@ struct ZenithApp: App {
 
 @MainActor
 final class WalletModel: ObservableObject {
+  let workDraft = WorkServerDraft()
+  let privateNetwork = PrivateNetworkModel(driver: TailscaleDriver())
   enum OnboardingCompletion { case created, imported }
   @Published var onboardingCompletion: OnboardingCompletion?
   @Published var state: WalletState?
@@ -71,6 +76,7 @@ final class WalletModel: ObservableObject {
       do {
         try store.save(configuration, replacing: previous)
         self.workServer = configuration
+        self.workDraft.reset()
         self.generation += 1
         self.notice = configuration == nil ? "Server removed from this device." : "Server saved. Review read access to connect."
         completion()
@@ -102,6 +108,7 @@ final class WalletModel: ObservableObject {
     }
   }
   func suspend() {
+    privateNetwork.suspend()
     operation?.cancel()
     operation = nil
     generation += 1

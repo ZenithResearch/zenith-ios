@@ -120,7 +120,7 @@ final class TransportTests: XCTestCase {
   }
   func testNetworkGuidanceDoesNotMisdiagnoseTLSOrCancellation() {
     let timeout = WorkConnectionFailure(code: .timedOut, network: .tailscale)
-    XCTAssertTrue(timeout.localizedDescription.contains("Open Tailscale"))
+    XCTAssertTrue(timeout.localizedDescription.contains("through Tailscale"))
     let publicTimeout = WorkConnectionFailure(code: .timedOut, network: nil)
     XCTAssertFalse(publicTimeout.localizedDescription.contains("Tailscale"))
     let certificate = WorkConnectionFailure(code: .serverCertificateUntrusted, network: .tailscale)

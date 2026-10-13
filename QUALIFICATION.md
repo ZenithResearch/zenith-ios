@@ -41,6 +41,16 @@ Five people unfamiliar with implementation try create/check, restore, connect an
 
 ## Generic Work server setup — build 9
 
-The app accepts an administrator-provided HTTPS server origin and public issuer pin through a reviewed connection file or manual entry. Tailscale is optional connection guidance. No Work server configuration is bundled, and unknown profile fields or credentials are rejected. A connection check carries no identity and cannot authorize reads. Saving/removing settings clears applicable local read authority so a new selection requires fresh approval. Existing bundled previews require explicit setup after upgrading.
+The app accepts an administrator-provided HTTPS server origin and public issuer pin through a reviewed connection file or manual entry. In build 9, Tailscale was optional connection guidance; build 10 replaces that behavior with the enforced embedded route below. No Work server configuration is bundled, and unknown profile fields or credentials are rejected. A connection check carries no identity and cannot authorize reads. Saving/removing settings clears applicable local read authority so a new selection requires fresh approval. Existing bundled previews require explicit setup after upgrading.
 
 Test empty setup, ordinary HTTPS and Tailscale choices, malformed/oversized/mismatched profiles, local persistence, stale replacements and removal. Verify that an unreachable server does not change saved settings, and that editing a URL cannot retain another receiver's authority. Inspect the final package for deployment configuration before distribution. On a real phone, separately qualify network setup, membership approval, exact read-scope approval and first read. Record installation-specific details only in ignored local evidence, never public source or release documents.
+
+## Embedded Tailscale — build 10
+
+- Source: 37 Swift tests pass, including 11 new private-network lifecycle/transport tests and the existing recovery/custody regressions.
+- Native dependency: pinned TailscaleKit iPhone and arm64 Simulator frameworks built; source patch and exact framework hashes recorded locally.
+- Simulator: real embedded node reached the official Tailscale sign-in page without the separate Tailscale app. Cancellation returned to the preserved setup. No account or tailnet was authorized during this check.
+- Signed iPhone build: build 10 verified and installed in place without removing Wallet storage. The user’s real tailnet sign-in/read result remains outstanding.
+- Pending physical-device gate: sign in, approve the app's node on the selected network, check server reachability, approve exact read scope, read a page, then background/lock/unlock and repeat. Include denial, expired/revoked device access, offline/cellular changes, largest Dynamic Type and VoiceOver.
+
+The minimum app OS is now iOS 18.1, matching the pinned framework. No system-wide VPN permission is requested. [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) records module and authority boundaries.
