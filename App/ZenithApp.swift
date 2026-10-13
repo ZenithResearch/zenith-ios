@@ -1,0 +1,104 @@
+import SwiftUI
+import ZenithKit
+
+@main
+struct ZenithApp: App {
+  @StateObject private var model = WalletModel()
+  @Environment(\.scenePhase) private var scene
+  var body: some Scene {
+    WindowGroup {
+      RootView().environmentObject(model)
+        .tint(Color(uiColor: UIColor { traits in
+          traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.47, green: 0.91, blue: 0.78, alpha: 1)
+            : UIColor(red: 0.09, green: 0.34, blue: 0.28, alpha: 1)
+        }))
+        .task { await model.load() }
+        .onChange(of: scene) { _, phase in
+          if phase == .background { model.suspend() }
+          model.obscured = phase != .active
+        }
+        .onReceive(
+          NotificationCenter.default.publisher(
+            for: UIApplication.protectedDataWillBecomeUnavailableNotification)
+        ) { _ in model.suspend() }
+    }
+  }
+}
+
+@MainActor
+final class WalletModel: ObservableObject {
+  enum OnboardingCompletion { case created, imported }
+  @Published var onboardingCompletion: OnboardingCompletion?
+  @Published var state: WalletState?
+  // Only encrypted selected files survive background locking, in memory.
+  @Published var recoverySelection: Data?
+  @Published var dataSelection: Data?
+  @Published var busy = false
+  @Published var error: String?
+  @Published var notice: String?
+  @Published var obscured = false
+  @Published var generation = 0
+  private(set) var repository: WalletRepository?
+  private var operation: Task<Void, Never>?
+  init() {
+    do {
+      let base = try FileManager.default.url(
+        for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+      repository = try WalletRepository(
+        directory: base.appendingPathComponent("CastaliaWallet", isDirectory: true))
+    } catch { self.error = "Wallet storage is unavailable. Reopen Zenith to try again." }
+  }
+  func load() async {
+    guard let repository else { return }
+    do { state = try await repository.state() } catch { self.error = error.localizedDescription }
+  }
+  func perform<T>(
+    _ action: @escaping (WalletRepository) async throws -> T, success: @escaping (T) -> Void
+  ) {
+    guard !busy, let repository else { return }
+    busy = true
+    error = nil
+    notice = nil
+    let version = generation
+    operation = Task {
+      do {
+        try Task.checkCancellation()
+        let result = try await action(repository)
+        guard version == generation else { return }
+        state = try await repository.state()
+        guard version == generation else { return }
+        busy = false
+        success(result)
+      } catch {
+        guard version == generation else { return }
+        busy = false
+        self.error = error.localizedDescription
+      }
+    }
+  }
+  func suspend() {
+    operation?.cancel()
+    operation = nil
+    generation += 1
+    busy = false
+    state = nil
+    error = nil
+    notice = nil
+    onboardingCompletion = nil
+    repository?.invalidatePendingWork()
+    Task {
+      await repository?.lock()
+      await load()
+    }
+  }
+  func cancel() {
+    operation?.cancel()
+    operation = nil
+    generation += 1
+    busy = false
+    error = nil
+    repository?.invalidatePendingWork()
+    Task { await repository?.cancel() }
+  }
+}

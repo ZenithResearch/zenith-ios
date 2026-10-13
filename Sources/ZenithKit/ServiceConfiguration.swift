@@ -1,0 +1,108 @@
+import Foundation
+
+/// Public proposed configuration bundled by the distributor. Loading it never
+/// installs trust; the person still reviews and approves it inside Wallet.
+public struct MembershipConfiguration: Decodable, Sendable {
+  public let name: String
+  public let endpoint: URL
+  public let scope: String?
+  public let trust: TrustConfiguration
+  public struct TrustConfiguration: Codable, Sendable {
+    public let v3: V3?
+    public let v4: V4?
+    public struct Root: Codable, Sendable {
+      public let issuerId: String
+      public let keyId: String
+      public let signatureSuite: String
+      public let publicKey: String
+    }
+    public struct V3: Codable, Sendable {
+      public let schema: String
+      public let version: Int
+      public let roots: [Root]
+    }
+    public struct Genesis: Codable, Sendable {
+      public let schema: String
+      public let version: Int
+      public let scopeType: String
+      public let alias: String
+      public let nonce: String
+    }
+    public struct Scope: Codable, Sendable {
+      public let scopeId: String
+      public let genesis: Genesis
+      public let issuerIds: [String]
+    }
+    public struct V4: Codable, Sendable {
+      public let schema: String
+      public let version: Int
+      public let roots: [Root]
+      public let scopes: [Scope]
+    }
+  }
+  public func validate() throws {
+    guard !name.isEmpty, name.count <= 80, endpoint.scheme == "https", endpoint.host != nil,
+      endpoint.user == nil, endpoint.password == nil, endpoint.query == nil,
+      endpoint.fragment == nil,
+      scope == nil ? trust.v3 != nil : trust.v4 != nil
+    else { throw WalletFailure.core("service_setup_required") }
+  }
+  public var trustData: Data { get throws { try JSONEncoder().encode(trust) } }
+}
+
+/// Ephemeral, cookie-free transport. A redirect never forwards an approved
+/// request or a credential to a different destination, including same-origin paths.
+private final class RedirectBlocker: NSObject, URLSessionTaskDelegate {
+  func urlSession(
+    _ session: URLSession, task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) { completionHandler(nil) }
+}
+public final class PrivateTransport: @unchecked Sendable {
+  private var session: URLSession!
+  public init(configuration: URLSessionConfiguration = .ephemeral) {
+    configuration.httpCookieStorage = nil
+    configuration.urlCache = nil
+    configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    configuration.timeoutIntervalForRequest = 20
+    session = URLSession(
+      configuration: configuration, delegate: RedirectBlocker(), delegateQueue: nil)
+  }
+  deinit { session.invalidateAndCancel() }
+  public func cancel() { session.getAllTasks { tasks in tasks.forEach { $0.cancel() } } }
+  public func request(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
+    guard request.url?.scheme == "https", request.url?.user == nil, request.url?.password == nil
+    else { throw WalletFailure.core("service_setup_required") }
+    let (bytes, response) = try await session.bytes(for: request)
+    guard let response = response as? HTTPURLResponse, response.url == request.url else {
+      throw WalletFailure.core("invalid_response")
+    }
+    if response.statusCode == 401 || response.statusCode == 403 {
+      throw WalletFailure.core("access_denied")
+    }
+    guard (200..<300).contains(response.statusCode) else {
+      throw WalletFailure.core("service_rejected_request")
+    }
+    guard response.expectedContentLength < 0 || response.expectedContentLength <= maximum else {
+      throw WalletFailure.invalidFile
+    }
+    var data = Data()
+    for try await byte in bytes {
+      guard data.count < maximum else { throw WalletFailure.invalidFile }
+      data.append(byte)
+    }
+    return data
+  }
+}
+
+extension MembershipConfiguration {
+  public static func bundled(in bundle: Bundle = .main) -> Self? {
+    guard let url = bundle.url(forResource: "Membership", withExtension: "json"),
+      let data = try? Data(contentsOf: url), data.count <= 65_536,
+      let value = try? JSONDecoder().decode(Self.self, from: data),
+      (try? value.validate()) != nil
+    else { return nil }
+    return value
+  }
+}

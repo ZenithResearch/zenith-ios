@@ -1,0 +1,14 @@
+.build/
+.derived-data/
+.derived-data-device/
+Artifacts/*
+!Artifacts/.gitkeep
+*.xcuserstate
+xcuserdata/
+.DS_Store
+
+.derived-data-*/
+App/Membership.json
+App/WorkAccess.json
+
+verification/

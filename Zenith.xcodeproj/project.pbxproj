@@ -1,0 +1,422 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */; };
+		132950C45C80186354AFCE78 /* WorkAccess.json in Resources */ = {isa = PBXBuildFile; fileRef = B998B4214287946745918F61 /* WorkAccess.json */; };
+		14222823819B4E0D23FD043A /* PortableViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */; };
+		1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */; };
+		3B5B02EF4F979FBEC6FE6329 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816148DAF0ACAFA83EE9439E /* RootView.swift */; };
+		544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */ = {isa = PBXBuildFile; fileRef = 3E750ECFD3FF478351FC7691 /* Membership.json */; };
+		587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */ = {isa = PBXBuildFile; productRef = 77F0D4105983A0787AFCCF72 /* ZenithKit */; };
+		5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */; };
+		66C54D034B9239C28919B21D /* ImportWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */; };
+		8A1908EF78DC15C31EB50783 /* CreateWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F28FE66495D39285938EBB /* CreateWalletFlow.swift */; };
+		8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6248D401A43A1978C64A543 /* TransferViews.swift */; };
+		8CCB3A40301BE61DB5E12030 /* WalletFlowComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */; };
+		9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */; };
+		9F860EF22BD635C6F5FBD94D /* MembershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */; };
+		A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */; };
+		CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */; };
+		DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryViews.swift; sourceTree = "<group>"; };
+		1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletFlowComponents.swift; sourceTree = "<group>"; };
+		2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreDataAttachmentSheet.swift; sourceTree = "<group>"; };
+		2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletCore-MIT.txt"; sourceTree = "<group>"; };
+		3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletPresentation-MIT.txt"; sourceTree = "<group>"; };
+		3E750ECFD3FF478351FC7691 /* Membership.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Membership.json; sourceTree = "<group>"; };
+		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		58F28FE66495D39285938EBB /* CreateWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateWalletFlow.swift; sourceTree = "<group>"; };
+		7FB49E98557EFB75CC85CFA3 /* zenith-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "zenith-ios"; path = .; sourceTree = SOURCE_ROOT; };
+		816148DAF0ACAFA83EE9439E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportWalletFlow.swift; sourceTree = "<group>"; };
+		B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableViews.swift; sourceTree = "<group>"; };
+		B998B4214287946745918F61 /* WorkAccess.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = WorkAccess.json; sourceTree = "<group>"; };
+		BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenithApp.swift; sourceTree = "<group>"; };
+		E4D471A1EAA463D3861BCF7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupWalletFlow.swift; sourceTree = "<group>"; };
+		E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkAccessViews.swift; sourceTree = "<group>"; };
+		E6248D401A43A1978C64A543 /* TransferViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferViews.swift; sourceTree = "<group>"; };
+		FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		ACF62A7863250A3272C1DF4F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0CA9B83ACBDA740FD20886FD = {
+			isa = PBXGroup;
+			children = (
+				F5F56BAF4CAF4DEFA278E552 /* App */,
+				F26A81E05E920BD19EE16246 /* Packages */,
+				B09EF9F6E1B8554DB3619CAE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		7652DC118BA843986EE7F0DE /* Licenses */ = {
+			isa = PBXGroup;
+			children = (
+				2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */,
+				3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */,
+			);
+			path = Licenses;
+			sourceTree = "<group>";
+		};
+		B09EF9F6E1B8554DB3619CAE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				442D81CC67F7BEC92EA98E90 /* Zenith.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F26A81E05E920BD19EE16246 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				7FB49E98557EFB75CC85CFA3 /* zenith-ios */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		F5F56BAF4CAF4DEFA278E552 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */,
+				58F28FE66495D39285938EBB /* CreateWalletFlow.swift */,
+				996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */,
+				E4D471A1EAA463D3861BCF7F /* Info.plist */,
+				3E750ECFD3FF478351FC7691 /* Membership.json */,
+				FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */,
+				B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */,
+				0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */,
+				2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */,
+				816148DAF0ACAFA83EE9439E /* RootView.swift */,
+				E6248D401A43A1978C64A543 /* TransferViews.swift */,
+				1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */,
+				B998B4214287946745918F61 /* WorkAccess.json */,
+				E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */,
+				BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */,
+				7652DC118BA843986EE7F0DE /* Licenses */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		95BDCC334A579D0EAC9FB039 /* Zenith */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DB97A5EB2B6CC34D80F847AA /* Build configuration list for PBXNativeTarget "Zenith" */;
+			buildPhases = (
+				7C6275036623F1EBCE9939E5 /* Sources */,
+				7838D1BEA581C6F8855E51A7 /* Resources */,
+				ACF62A7863250A3272C1DF4F /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Zenith;
+			packageProductDependencies = (
+				77F0D4105983A0787AFCCF72 /* ZenithKit */,
+			);
+			productName = Zenith;
+			productReference = 442D81CC67F7BEC92EA98E90 /* Zenith.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		315114D9A2FF386DD930019F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 874B9B3E0BA319F4772B2B30 /* Build configuration list for PBXProject "Zenith" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0CA9B83ACBDA740FD20886FD;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				3167EE8ECC16996ABE17C831 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B09EF9F6E1B8554DB3619CAE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				95BDCC334A579D0EAC9FB039 /* Zenith */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7838D1BEA581C6F8855E51A7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */,
+				DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */,
+				544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */,
+				132950C45C80186354AFCE78 /* WorkAccess.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7C6275036623F1EBCE9939E5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */,
+				8A1908EF78DC15C31EB50783 /* CreateWalletFlow.swift in Sources */,
+				66C54D034B9239C28919B21D /* ImportWalletFlow.swift in Sources */,
+				9F860EF22BD635C6F5FBD94D /* MembershipView.swift in Sources */,
+				14222823819B4E0D23FD043A /* PortableViews.swift in Sources */,
+				CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */,
+				5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */,
+				3B5B02EF4F979FBEC6FE6329 /* RootView.swift in Sources */,
+				8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */,
+				8CCB3A40301BE61DB5E12030 /* WalletFlowComponents.swift in Sources */,
+				A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */,
+				1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1F63B1336B612F6CBE1F3523 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		34441AB62BAF460C3127497D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Zenith;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.zenith.preview.wallet;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		593A8BE15745CF2C96BED232 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Zenith;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ca.zenith.preview.wallet;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F79DACB008164CEA331CC475 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		874B9B3E0BA319F4772B2B30 /* Build configuration list for PBXProject "Zenith" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F79DACB008164CEA331CC475 /* Debug */,
+				1F63B1336B612F6CBE1F3523 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DB97A5EB2B6CC34D80F847AA /* Build configuration list for PBXNativeTarget "Zenith" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				593A8BE15745CF2C96BED232 /* Debug */,
+				34441AB62BAF460C3127497D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		3167EE8ECC16996ABE17C831 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		77F0D4105983A0787AFCCF72 /* ZenithKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ZenithKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 315114D9A2FF386DD930019F /* Project object */;
+}

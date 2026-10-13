@@ -1,0 +1,17 @@
+{
+  "schema": "zenith.ios-dependencies.v1",
+  "wallet": {
+    "repository": "https://github.com/bananawalnut/castalia-wallet",
+    "revision": "f65401704acf60dcd461527f495afaa6def0bfb3",
+    "crates": [
+      "castalia-wallet-core",
+      "castalia-wallet-native",
+      "castalia-wallet-presentation"
+    ]
+  },
+  "read_contract": {
+    "credential": "castalia.read-credential.v1",
+    "presentation": "castalia.read-presentation.v1",
+    "transport": "devgraph.native-read.v2"
+  }
+}

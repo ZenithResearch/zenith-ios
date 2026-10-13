@@ -1,0 +1,51 @@
+name: Zenith
+options:
+  bundleIdPrefix: ca.zenith.preview
+  deploymentTarget:
+    iOS: '17.0'
+packages:
+  ZenithKit:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    ARCHS: arm64
+    CODE_SIGNING_ALLOWED: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+targets:
+  Zenith:
+    type: application
+    platform: iOS
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        NSCameraUsageDescription: Scan an encrypted recovery file from your laptop screen to import your wallet offline.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: ca.castalia.recovery
+            UTTypeDescription: Encrypted Castalia recovery file
+            UTTypeConformsTo: [public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [castalia-recovery]
+    sources: [App]
+    dependencies:
+      - package: ZenithKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.zenith.preview.wallet
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zenith
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        TARGETED_DEVICE_FAMILY: '1,2'
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '7'
+schemes:
+  Zenith:
+    build:
+      targets:
+        Zenith: all
