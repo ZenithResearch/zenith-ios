@@ -77,7 +77,7 @@ struct PrivateNetworkRow: View {
     switch network.phase {
     case .idle: return "Tailscale not connected"
     case .connecting: return "Connecting Tailscale…"
-    case .signInRequired: return "Sign in to Tailscale"
+    case .signInRequired: return "Not signed in"
     case .awaitingApproval: return "Waiting for device approval"
     case .connected: return "Private network connected"
     case .paused: return "Tailscale paused"

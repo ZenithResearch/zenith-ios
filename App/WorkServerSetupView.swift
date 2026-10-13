@@ -36,7 +36,14 @@ struct WorkServerSetupView: View {
         }
       } else {
         Section {
-          TextField("https://devgraph.example", text: $draft.address)
+          Button("Import connection file", systemImage: "doc.badge.plus") { importing = true }
+            .accessibilityIdentifier("work.server.import")
+        } footer: {
+          Text("A connection file fills in your server address and verification settings. Get it from your server administrator.")
+        }
+        Section {
+          TextField("Server address", text: $draft.address,
+            prompt: Text("Enter HTTPS server address").foregroundStyle(.secondary))
             .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
             .accessibilityLabel("Server address")
             .accessibilityIdentifier("work.server.address")
@@ -56,12 +63,10 @@ struct WorkServerSetupView: View {
           Text("Use the HTTPS address supplied by your server administrator.")
         }
         Section {
-          Button("Import connection file", systemImage: "doc.badge.plus") { importing = true }
-            .accessibilityIdentifier("work.server.import")
           if !draft.issuer.isEmpty && !draft.publicKey.isEmpty {
             Label("Verification settings added", systemImage: "checkmark.circle")
           }
-          DisclosureGroup("Enter settings manually") {
+          DisclosureGroup("Advanced verification settings") {
             TextField("Server name", text: $draft.name)
               .accessibilityLabel("Server name")
             TextField("Issuer", text: $draft.issuer)
@@ -75,7 +80,7 @@ struct WorkServerSetupView: View {
               .accessibilityLabel("Issuer public key")
           }
         } header: { Text("Server verification") } footer: {
-          Text("Get a connection file or public verification settings from your server administrator. Never enter a password, private key or read credential here.")
+          Text("Only needed without a connection file. Use public settings from your server administrator; never enter a password or private key.")
         }
         Section {
           Button("Review server") { review() }

@@ -54,3 +54,11 @@ Test empty setup, ordinary HTTPS and Tailscale choices, malformed/oversized/mism
 - Pending physical-device gate: sign in, approve the app's node on the selected network, check server reachability, approve exact read scope, read a page, then background/lock/unlock and repeat. Include denial, expired/revoked device access, offline/cellular changes, largest Dynamic Type and VoiceOver.
 
 The minimum app OS is now iOS 18.1, matching the pinned framework. No system-wide VPN permission is requested. [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) records module and authority boundaries.
+
+## Connection setup clarity — build 11
+
+Connection-file import now appears first, the empty address field has an instructional placeholder, and manual verification settings remain collapsed. The sign-in status and action use distinct wording. No transport, trust, or credential behavior changed.
+
+- The isolated Simulator setup app built and launched; the direct/private selector, import placement, address prompt, and collapsed verification controls were visually checked.
+- The complete signed iPhone app built and passed signature verification. A package scan found no local Work deployment values or bundled Work configuration. Build 11 has not yet been installed on the phone.
+- The user confirmed that build 10 opens the sign-in page on the physical phone. Network enrollment, server reachability, and an approved read remain unverified.
