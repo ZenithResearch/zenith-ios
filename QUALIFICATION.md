@@ -1,5 +1,11 @@
 # Qualification and release handoff
 
+## LAN addition — build 13
+
+The 47 native tests pass, including a real, credential-free HTTPS probe against the operator's LAN receiver and rejection of an incorrect certificate pin. Two Python producer tests verify public-only profile export and unsafe-input rejection. Signed iPhone and arm64 Simulator builds pass. The app includes Local Network permission copy and no broad ATS exceptions or bundled deployment settings. Installed server checks reject unauthenticated reads and expose no write/docs route; the existing Tailscale read endpoint remains protected.
+
+The isolated connection-only Simulator app rendered the LAN review and reached the real HTTPS receiver using the actual transport, without a wallet identity or credential. Build 13 was installed in place on the paired phone and a public LAN profile was added alongside its existing profile. Launch was blocked by the phone's locked screen. Physical iPhone LAN permission, read approval, first read, and switching back to Tailscale remain unconfirmed. The user reported the prior Tailscale flow working before this change. These results do not qualify the separate mutation-signing release gate. See [LAN setup and boundaries](LOCAL-NETWORK.md).
+
 Run against disposable identities, approved test trust, isolated receiver storage, and an explicitly configured build. Never reuse a live wallet or broaden production grants for a test.
 
 ## Source checks

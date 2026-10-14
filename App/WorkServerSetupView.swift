@@ -66,6 +66,9 @@ struct WorkServerSetupView: View {
               Label {
                 VStack(alignment: .leading, spacing: 5) {
                   Text("Connect to \(item.configuration.name)").font(.headline)
+                  Text(item.configuration.network == .lan ? "Local network · Same Wi-Fi" :
+                    item.configuration.network == .tailscale ? "Private via Tailscale" : "Direct HTTPS")
+                    .font(.subheadline)
                   Text(item.configuration.origin).font(.footnote).foregroundStyle(.secondary)
                 }
               } icon: { Image(systemName: "network") }
@@ -110,6 +113,10 @@ struct WorkServerSetupView: View {
         Text(server.origin).font(.subheadline).textSelection(.enabled)
         if server.network == .tailscale {
           PrivateNetworkRow().disabled(busy)
+        } else if server.network == .lan {
+          Label("Local network", systemImage: "wifi")
+          Text("Join the same Wi-Fi as your server. When Zenith asks for Local Network access, tap Allow.")
+            .font(.subheadline).foregroundStyle(.secondary)
         } else {
           Label("Direct connection", systemImage: "network")
         }
@@ -134,6 +141,10 @@ struct WorkServerSetupView: View {
           LabeledContent("Issuer", value: server.issuer)
           LabeledContent("Key ID", value: server.authority.key_id)
           Text(server.authority.public_key).font(.caption.monospaced()).textSelection(.enabled)
+          if let certificate = server.tls_certificate_sha256 {
+            Text("LAN certificate · SHA-256").font(.caption)
+            Text(certificate).font(.caption.monospaced()).textSelection(.enabled)
+          }
         }
       }
       feedback
@@ -150,7 +161,7 @@ struct WorkServerSetupView: View {
   }
   private func select(_ server: WorkAccessConfiguration, connect: Bool = false) {
     if server.network != .tailscale { privateNetwork.disconnect() }
-    draft.tailscale = server.network == .tailscale
+    draft.network = server.network
     draft.preview = server
     error = nil
     if connect, server.network == .tailscale, privateNetwork.phase != .connected { privateNetwork.connect() }

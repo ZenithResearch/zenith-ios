@@ -11,7 +11,8 @@ final class WorkServerDraft: ObservableObject {
   @Published var issuer = ""
   @Published var keyID = ""
   @Published var publicKey = ""
-  @Published var tailscale = false
+  @Published var network: WorkNetwork?
+  @Published var tlsCertificateSHA256 = ""
   @Published var preview: WorkAccessConfiguration?
   @Published var verificationOrigin: String?
 
@@ -22,7 +23,8 @@ final class WorkServerDraft: ObservableObject {
     issuer = ""
     keyID = ""
     publicKey = ""
-    tailscale = false
+    network = nil
+    tlsCertificateSHA256 = ""
     preview = nil
     verificationOrigin = nil
   }

@@ -13,12 +13,14 @@ public struct WorkAccessConfiguration: Codable, Sendable, Hashable {
   public let issuer: String
   public let authority: ReadAuthorityPin
   public let network: WorkNetwork?
+  public let tls_certificate_sha256: String?
   public init(name: String, receiver: URL, issuer: String, keyID: String,
-    publicKey: String, network: WorkNetwork? = nil) throws {
+    publicKey: String, network: WorkNetwork? = nil, tlsCertificateSHA256: String? = nil) throws {
     self.name = name
     self.receiver = receiver
     self.issuer = issuer
     self.network = network
+    self.tls_certificate_sha256 = tlsCertificateSHA256
     let origin = receiver.absoluteString.hasSuffix("/")
       ? String(receiver.absoluteString.dropLast()) : receiver.absoluteString
     self.authority = ReadAuthorityPin(issuer: issuer, key_id: keyID,
@@ -26,6 +28,10 @@ public struct WorkAccessConfiguration: Codable, Sendable, Hashable {
     try validate()
   }
   public func validate() throws {
+    guard network == .lan
+      ? tls_certificate_sha256?.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+      : tls_certificate_sha256 == nil
+    else { throw WalletFailure.core("service_setup_required") }
     guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       name.count <= 80, !issuer.isEmpty, issuer.count <= 256, receiver.scheme == "https",
       receiver.host != nil,
@@ -121,7 +127,10 @@ public final class DevgraphReadClient: @unchecked Sendable {
     self.repository = repository
     self.configuration = configuration
     guard configuration.network != .tailscale || transport != nil else { throw PrivateNetworkError.disconnected }
-    self.transport = transport ?? PrivateTransport()
+    if configuration.network == .lan, let transport, !transport.verifiesLAN(configuration) {
+      throw WalletFailure.core("service_setup_required")
+    }
+    self.transport = try transport ?? PrivateTransport(workServer: configuration)
   }
   public var connection: WorkAccessConfiguration { configuration }
   public func cancel() { transport.cancel() }

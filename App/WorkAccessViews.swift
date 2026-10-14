@@ -6,7 +6,7 @@ func workClient(_ model: WalletModel) -> DevgraphReadClient? {
   guard let configuration = model.workServer,
     let repository = model.repository
   else { return nil }
-  let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : PrivateTransport()
+  let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : nil
   return try? DevgraphReadClient(repository: repository, configuration: configuration, transport: transport)
 }
 struct WorkAccessView: View {
@@ -17,6 +17,7 @@ struct WorkAccessView: View {
   @State private var proposal: ReadAccessProposal?
   @State private var current: NativeReadManifest?
   @State private var continueSetup = false
+  @State private var changingServer = false
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     Group {
@@ -99,6 +100,7 @@ struct WorkAccessView: View {
             }
           }
           Section {
+            Button("Change connection") { changingServer = true }.disabled(model.busy)
             Button("Remove server", role: .destructive) {
               client.cancel()
               model.saveWorkServer(nil) {}
@@ -113,6 +115,16 @@ struct WorkAccessView: View {
           continueSetup = true
           model.saveWorkServer(configuration) {}
         }
+      }
+    }.sheet(isPresented: $changingServer) {
+      NavigationStack {
+        WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
+          client?.cancel()
+          continueSetup = true
+          model.saveWorkServer(configuration) { changingServer = false }
+        }
+        .environmentObject(model.workDraft)
+        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { changingServer = false } } }
       }
     }.task(id: model.generation) {
       client?.cancel()

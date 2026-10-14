@@ -2,6 +2,8 @@
 
 Zenith uses the official TailscaleKit wrapper over libtailscale. The embedded userspace node belongs to this app installation; it is not the separate Tailscale app or a device-wide VPN. The shared Castalia Rust core remains unchanged.
 
+For a server on the same Wi-Fi, [Local network setup](LOCAL-NETWORK.md) provides a separate HTTPS route. Use **Change connection** to choose a saved connection file; Tailscale remains available. There is no automatic route fallback.
+
 ## Reviewed journey
 
 The UX and lifecycle review selected one Connection picker and one status/action row:

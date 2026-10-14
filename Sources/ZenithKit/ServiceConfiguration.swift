@@ -53,6 +53,22 @@ public struct MembershipConfiguration: Decodable, Sendable {
 /// Ephemeral, cookie-free transport. A redirect never forwards an approved
 /// request or a credential to a different destination, including same-origin paths.
 private final class RedirectBlocker: NSObject, URLSessionTaskDelegate {
+  let lanTrust: LANServerTrust?
+  init(lanTrust: LANServerTrust?) { self.lanTrust = lanTrust }
+  func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    urlSession(session, didReceive: challenge, completionHandler: completionHandler)
+  }
+  func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    guard let lanTrust else { completionHandler(.performDefaultHandling, nil); return }
+    guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+      challenge.previousFailureCount == 0,
+      let trust = challenge.protectionSpace.serverTrust,
+      lanTrust.accepts(trust, host: challenge.protectionSpace.host, port: challenge.protectionSpace.port)
+    else { completionHandler(.cancelAuthenticationChallenge, nil); return }
+    completionHandler(.useCredential, URLCredential(trust: trust))
+  }
   func urlSession(
     _ session: URLSession, task: URLSessionTask,
     willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
@@ -61,16 +77,29 @@ private final class RedirectBlocker: NSObject, URLSessionTaskDelegate {
 }
 public final class PrivateTransport: @unchecked Sendable {
   private let configurationProvider: @Sendable () async throws -> URLSessionConfiguration
+  private let lanTrust: LANServerTrust?
   private let guardLock = NSLock()
   private var generation = 0
   private var sessions: [UUID: URLSession] = [:]
   public init(configuration: URLSessionConfiguration = .ephemeral) {
+    lanTrust = nil
     configurationProvider = { configuration.copy() as! URLSessionConfiguration }
   }
   /// Used by the private-network route. Failure must propagate; never retry
   /// with a default/direct session when this provider is unavailable.
   public init(configurationProvider: @escaping @Sendable () async throws -> URLSessionConfiguration) {
+    lanTrust = nil
     self.configurationProvider = configurationProvider
+  }
+  /// Trust is scoped to this reviewed LAN receiver, never installed system-wide.
+  public init(workServer: WorkAccessConfiguration) throws {
+    try workServer.validate()
+    guard workServer.network != .tailscale else { throw PrivateNetworkError.disconnected }
+    lanTrust = try workServer.network == .lan ? LANServerTrust(configuration: workServer) : nil
+    configurationProvider = { .ephemeral }
+  }
+  func verifiesLAN(_ configuration: WorkAccessConfiguration) -> Bool {
+    lanTrust == (try? LANServerTrust(configuration: configuration)) && lanTrust != nil
   }
   deinit { sessions.values.forEach { $0.invalidateAndCancel() } }
   public func cancel() {
@@ -110,7 +139,7 @@ public final class PrivateTransport: @unchecked Sendable {
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
     configuration.timeoutIntervalForRequest = 20
     configuration.timeoutIntervalForResource = 30
-    let session = URLSession(configuration: configuration, delegate: RedirectBlocker(), delegateQueue: nil)
+    let session = URLSession(configuration: configuration, delegate: RedirectBlocker(lanTrust: lanTrust), delegateQueue: nil)
     let id = UUID()
     try register(session, ticket: version, id: id)
     return (id, session)
@@ -118,6 +147,7 @@ public final class PrivateTransport: @unchecked Sendable {
   /// Exercise only the closed read endpoint with an empty body. A 401 with the
   /// expected bounded error demonstrates reachability, never authorization.
   public func checkReadReceiver(at origin: URL) async throws {
+    if let lanTrust, !lanTrust.permits(origin) { throw WalletFailure.core("service_setup_required") }
     guard origin.scheme == "https", origin.host != nil,
       origin.user == nil, origin.password == nil, origin.query == nil,
       origin.fragment == nil, origin.path.isEmpty || origin.path == "/"
@@ -129,7 +159,7 @@ public final class PrivateTransport: @unchecked Sendable {
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     let (id, session) = try await openSession()
     defer { finish(id) }
-    let (bytes, response) = try await session.bytes(for: request)
+    let (bytes, response) = try await session.bytes(for: request, delegate: session.delegate as? URLSessionTaskDelegate)
     guard let response = response as? HTTPURLResponse,
       response.url == url, response.statusCode == 401,
       response.expectedContentLength <= 1024
@@ -144,11 +174,14 @@ public final class PrivateTransport: @unchecked Sendable {
     else { throw WalletFailure.core("invalid_response") }
   }
   public func request(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
+    if let lanTrust, request.url.map({ !lanTrust.permits($0) }) ?? true {
+      throw WalletFailure.core("service_setup_required")
+    }
     guard request.url?.scheme == "https", request.url?.user == nil, request.url?.password == nil
     else { throw WalletFailure.core("service_setup_required") }
     let (id, session) = try await openSession()
     defer { finish(id) }
-    let (bytes, response) = try await session.bytes(for: request)
+    let (bytes, response) = try await session.bytes(for: request, delegate: session.delegate as? URLSessionTaskDelegate)
     guard let response = response as? HTTPURLResponse, response.url == request.url else {
       throw WalletFailure.core("invalid_response")
     }

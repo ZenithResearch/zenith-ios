@@ -13,15 +13,20 @@ struct ManualWorkServerView: View {
         TextField("HTTPS server address", text: $draft.address)
           .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
           .accessibilityIdentifier("work.server.address")
-        Picker("Connection", selection: $draft.tailscale) {
-          Text("Direct").tag(false)
-          Text("Private via Tailscale").tag(true)
+        Picker("Connection", selection: $draft.network) {
+          Text("Direct HTTPS").tag(WorkNetwork?.none)
+          Text("Private via Tailscale").tag(WorkNetwork?.some(.tailscale))
+          Text("Local network").tag(WorkNetwork?.some(.lan))
         }.accessibilityIdentifier("work.connection.route")
       }
       Section {
         TextField("Issuer", text: $draft.issuer)
         TextField("Key ID", text: $draft.keyID)
         TextField("Issuer public key", text: $draft.publicKey, axis: .vertical)
+        if draft.network == .lan {
+          TextField("TLS certificate SHA-256", text: $draft.tlsCertificateSHA256, axis: .vertical)
+          Text("Use the fingerprint from your administrator’s connection file.").font(.footnote)
+        }
       } header: { Text("Public verification settings") } footer: {
         Text("Get these public settings from your administrator. Never enter a password, private key or read credential here.")
       }.textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -32,7 +37,9 @@ struct ManualWorkServerView: View {
               issuer: draft.issuer.trimmingCharacters(in: .whitespacesAndNewlines),
               keyID: draft.keyID.trimmingCharacters(in: .whitespacesAndNewlines),
               publicKey: draft.publicKey.trimmingCharacters(in: .whitespacesAndNewlines),
-              network: draft.tailscale ? .tailscale : nil))
+              network: draft.network,
+              tlsCertificateSHA256: draft.network == .lan
+                ? draft.tlsCertificateSHA256.trimmingCharacters(in: .whitespacesAndNewlines) : nil))
           } catch { self.error = "Check the HTTPS address and public verification settings supplied by your administrator." }
         }.disabled(draft.address.isEmpty || draft.issuer.isEmpty || draft.keyID.isEmpty || draft.publicKey.isEmpty)
       }
@@ -40,7 +47,7 @@ struct ManualWorkServerView: View {
     }.navigationTitle("Manual setup").navigationBarTitleDisplayMode(.inline)
       .onChange(of: draft.address) { old, new in
         if !old.isEmpty, (try? WorkServerSettings.address(old)) != (try? WorkServerSettings.address(new)) {
-          draft.issuer = ""; draft.keyID = ""; draft.publicKey = ""
+          draft.issuer = ""; draft.keyID = ""; draft.publicKey = ""; draft.tlsCertificateSHA256 = ""
         }
       }
   }

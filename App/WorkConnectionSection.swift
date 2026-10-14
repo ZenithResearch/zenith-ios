@@ -10,15 +10,21 @@ struct WorkConnectionSection: View {
       Text(configuration.origin).font(.footnote).foregroundStyle(.secondary)
         .textSelection(.enabled)
       if configuration.network == .tailscale { PrivateNetworkRow() }
-      WorkConnectionCheck(receiver: configuration.receiver, network: configuration.network, busy: busy)
+      if configuration.network == .lan {
+        Label("Local network", systemImage: "wifi")
+        Text("Use the same Wi-Fi as your server. Allow Local Network access when asked.")
+          .font(.footnote).foregroundStyle(.secondary)
+      }
+      WorkConnectionCheck(configuration: configuration, busy: busy)
     }
   }
 }
 
 /// Reachability is separate from issuer trust, Wallet approval and saved authority.
 struct WorkConnectionCheck: View {
-  let receiver: URL
-  let network: WorkNetwork?
+  let configuration: WorkAccessConfiguration
+  private var receiver: URL { configuration.receiver }
+  private var network: WorkNetwork? { configuration.network }
   var busy = false
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @Environment(\.scenePhase) private var scene
@@ -41,8 +47,7 @@ struct WorkConnectionCheck: View {
     if let failure { Text(failure).foregroundStyle(.red).accessibilityAddTraits(.updatesFrequently) }
     Text("This check sends no Wallet ID or credentials.").font(.footnote).foregroundStyle(.secondary)
       .onChange(of: scene) { _, phase in if phase != .active { reset() } }
-      .onChange(of: receiver) { _, _ in reset() }
-      .onChange(of: network) { _, _ in reset() }
+      .onChange(of: configuration) { _, _ in reset() }
       .onChange(of: privateNetwork.generation) { _, _ in reset() }
       .onDisappear { reset() }
   }
@@ -60,7 +65,7 @@ struct WorkConnectionCheck: View {
     checking = true
     checkTask = Task { @MainActor in
       do {
-        let transport = network == .tailscale ? privateNetwork.transport() : PrivateTransport()
+        let transport = try network == .tailscale ? privateNetwork.transport() : PrivateTransport(workServer: configuration)
         try await transport.checkReadReceiver(at: receiver)
         guard !Task.isCancelled else { return }
         reachable = true

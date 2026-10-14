@@ -24,6 +24,7 @@ targets:
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
         NSFaceIDUsageDescription: Unlock your Zenith wallet using Face ID instead of typing its password.
+        NSLocalNetworkUsageDescription: Connect to your chosen work server on the same Wi-Fi network.
         NSCameraUsageDescription: Scan an encrypted recovery file from your laptop screen to import your wallet offline.
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: ca.castalia.recovery
@@ -49,7 +50,7 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: '1,2'
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '12'
+        CURRENT_PROJECT_VERSION: '13'
 schemes:
   Zenith:
     build:

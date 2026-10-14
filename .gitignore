@@ -12,3 +12,4 @@ App/Membership.json
 App/WorkAccess.json
 
 verification/
+__pycache__/
