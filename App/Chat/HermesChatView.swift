@@ -6,7 +6,8 @@ struct HermesChatView: View {
   @EnvironmentObject private var wallet: WalletModel
   @EnvironmentObject private var network: PrivateNetworkModel
   @StateObject private var chat = HermesChatModel()
-  @State private var text = ""
+  @StateObject private var dictation = ChatDictation(driver: AppleDictationDriver())
+  @Environment(\.scenePhase) private var scene
   @State private var settings = false
   @State private var confirmNew = false
   var body: some View {
@@ -73,20 +74,49 @@ struct HermesChatView: View {
                 if let id { withAnimation { scroll.scrollTo(id, anchor: .bottom) } }
               }
           }
-          HStack(alignment: .bottom, spacing: 12) {
-            TextField("Message Hermes", text: $text, axis: .vertical).lineLimit(1...6)
-              .textFieldStyle(.roundedBorder).accessibilityIdentifier("chat.message")
-            Button {
-              let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-              text = ""
-              chat.send(value, network: network)
-            } label: {
-              Image(systemName: "arrow.up.circle.fill").font(.title)
+          VStack(alignment: .leading, spacing: 8) {
+            if dictation.busy {
+              HStack {
+                if dictation.phase != .recording { ProgressView() }
+                Text(dictationStatus).font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Button("Discard dictation") { dictation.discard() }.font(.footnote)
+              }
             }
-            .accessibilityLabel("Send message")
-            .disabled(
-              text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chat.busy
-                || chat.waitingForReply || !chat.ready)
+            HStack(alignment: .bottom, spacing: 12) {
+              TextField("Message Hermes", text: $dictation.draft, axis: .vertical).lineLimit(1...6)
+                .textFieldStyle(.roundedBorder).accessibilityIdentifier("chat.message")
+                .disabled(dictation.busy)
+              Button {
+                if dictation.phase == .recording { dictation.stop() }
+                else if dictation.busy { dictation.discard() }
+                else {
+                  UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                  dictation.start()
+                }
+              } label: {
+                Image(systemName: dictation.busy ? "stop.circle.fill" : "mic.fill")
+                  .font(.title2).foregroundStyle(dictation.busy ? .red : Color.accentColor)
+                  .frame(minWidth: 44, minHeight: 44)
+              }
+              .accessibilityLabel(dictation.busy ? "Stop dictation" : "Dictate message")
+              .accessibilityHint("On-device speech to text. Review the text, then send it yourself.")
+              .accessibilityIdentifier("chat.dictate")
+              .disabled(dictation.phase == .finishing || (!dictation.busy && (chat.busy || chat.waitingForReply || !chat.ready)))
+              Button {
+                let value = dictation.draft.trimmingCharacters(in: .whitespacesAndNewlines)
+                dictation.clear()
+                chat.send(value, network: network)
+              } label: {
+                Image(systemName: "arrow.up.circle.fill").font(.title)
+              }
+              .accessibilityLabel("Send message")
+              .disabled(dictation.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || dictation.busy || chat.busy || chat.waitingForReply || !chat.ready)
+            }
+            if let error = dictation.error {
+              Text(error).font(.footnote).foregroundStyle(.red)
+            }
           }.padding().background(.bar)
         }
       }.navigationTitle("Chat")
@@ -97,7 +127,7 @@ struct HermesChatView: View {
           ToolbarItem(placement: .topBarTrailing) {
             Button("New chat", systemImage: "square.and.pencil") {
               if chat.waitingForReply { confirmNew = true } else { chat.newChat() }
-            }.disabled(chat.busy || chat.connection == nil)
+            }.disabled(chat.busy || chat.connection == nil || dictation.busy)
           }
         }
         .sheet(isPresented: $settings) {
@@ -118,7 +148,7 @@ struct HermesChatView: View {
           )
         }
         .task(id: wallet.generation) {
-          chat.suspend(); text = ""
+          chat.suspend(); dictation.clear()
           if network.phase == .connected { chat.load(network: network) }
         }
         .onChange(of: network.phase) { _, phase in
@@ -126,12 +156,28 @@ struct HermesChatView: View {
         }
         .onChange(of: network.generation) { _, _ in
           chat.suspend()
-          text = ""
+          dictation.clear()
+        }
+        .onChange(of: settings) { _, open in
+          if open { dictation.discard() }
+        }
+        .onChange(of: scene) { _, phase in
+          if phase == .background || (phase == .inactive && dictation.phase != .authorizing) {
+            dictation.clear()
+          }
         }
         .onDisappear {
           chat.suspend()
-          text = ""
+          dictation.clear()
         }
+    }
+  }
+  private var dictationStatus: String {
+    switch dictation.phase {
+    case .idle: return ""
+    case .authorizing: return "Preparing dictation…"
+    case .recording: return "Listening… Tap Stop to review."
+    case .finishing: return "Finishing dictation…"
     }
   }
 }

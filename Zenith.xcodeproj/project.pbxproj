@@ -32,6 +32,7 @@
 		9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */; };
 		9F860EF22BD635C6F5FBD94D /* MembershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */; };
 		A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */; };
+		B9A5B0883AC8F1DA3EEE6A41 /* AppleDictationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */; };
 		CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */; };
 		DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */; };
 		EA036C48C0EDB9C6D1FD4D3D /* HermesChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845B9719E8A4CB3429589DF2 /* HermesChatView.swift */; };
@@ -63,6 +64,7 @@
 		3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletPresentation-MIT.txt"; sourceTree = "<group>"; };
 		3E750ECFD3FF478351FC7691 /* Membership.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Membership.json; sourceTree = "<group>"; };
 		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationDriver.swift; sourceTree = "<group>"; };
 		4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateNetworkView.swift; sourceTree = "<group>"; };
 		58F28FE66495D39285938EBB /* CreateWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateWalletFlow.swift; sourceTree = "<group>"; };
 		5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleDriver.swift; sourceTree = "<group>"; };
@@ -115,6 +117,7 @@
 		0FE9E591D1B27B8EFCEB7696 /* Chat */ = {
 			isa = PBXGroup;
 			children = (
+				496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */,
 				A25D0F3A41C6DB693A5D6406 /* HermesChatKeychain.swift */,
 				C76C2B4569D4805FDA76BBCD /* HermesChatModel.swift */,
 				845B9719E8A4CB3429589DF2 /* HermesChatView.swift */,
@@ -289,6 +292,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B9A5B0883AC8F1DA3EEE6A41 /* AppleDictationDriver.swift in Sources */,
 				08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */,
 				65F141F12BB59F36E3A08E8B /* BiometricKeychain.swift in Sources */,
 				8A1908EF78DC15C31EB50783 /* CreateWalletFlow.swift in Sources */,
@@ -382,7 +386,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",
@@ -409,7 +413,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",

@@ -23,6 +23,8 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        NSMicrophoneUsageDescription: Dictate a Chat message using your iPhone microphone. Review the text before sending.
+        NSSpeechRecognitionUsageDescription: Turn your spoken words into editable Chat text using on-device speech recognition.
         NSFaceIDUsageDescription: Unlock your Zenith wallet using Face ID instead of typing its password.
         NSLocalNetworkUsageDescription: Connect to your chosen work server on the same Wi-Fi network.
         NSCameraUsageDescription: Scan an encrypted recovery file from your laptop screen to import your wallet offline.
@@ -50,7 +52,7 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: '1,2'
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '16'
+        CURRENT_PROJECT_VERSION: '17'
 schemes:
   Zenith:
     build:

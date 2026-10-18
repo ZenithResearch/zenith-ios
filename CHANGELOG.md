@@ -4,6 +4,10 @@
 
 ### Added
 
+- Prepare on-device speech to text in the Chat composer with explicit microphone permission, editable transcripts, bounded recording and cleanup on interruption/locking. Sending remains manual. Development build 17.
+
+### Added
+
 - Add explicit Tailscale auth-key enrollment with secure entry or a bounded text-file import in the shared Work/Chat connection screen. Keep browser sign-in and existing saved device identities; never replay enrollment keys on foreground resume. Development build 16.
 
 ### Fixed

@@ -26,6 +26,10 @@
 	<string>Unlock your Zenith wallet using Face ID instead of typing its password.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Connect to your chosen work server on the same Wi-Fi network.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dictate a Chat message using your iPhone microphone. Review the text before sending.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turn your spoken words into editable Chat text using on-device speech recognition.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UTExportedTypeDeclarations</key>

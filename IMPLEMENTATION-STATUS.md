@@ -60,3 +60,7 @@ The actual Swift client passed an authenticated chat and history reload through 
 ## Tailscale auth-key enrollment — build 16, October 17, 2026
 
 The shared private connection setup supports explicit auth-key entry and bounded plain-text file import. Enrollment uses the pinned TailscaleKit configuration authKey option and retains non-ephemeral, protected installation-local node state. Input clears on submission/inactivity/dismissal; the native runtime holds the supplied key only during that node lifetime. Reconnect/resume uses saved identity without replaying the key. Key enrollment suppresses browser sign-in fallback and reports generic failures without upstream error text. Browser sign-in and existing Work/Hermes settings remain compatible. A valid operator key is required for live acceptance.
+
+## Chat dictation — build 17, October 17, 2026
+
+Prepared a microphone composer action using Apple Speech/AVAudioEngine with required on-device recognition and explicit permission prompts. The transcript joins the current draft, stays editable after Stop, and is sent only through the existing explicit Send action. Capture is bounded to 55 seconds, finalization to three seconds, and stale callbacks are rejected after stopping/cancelling/clearing. No audio uploads, audio files or background recording are introduced. The iOS 18.1 deployment minimum and text-only gateway protocol remain compatible. Physical-device dictation, denial, audio interruptions, locales and accessibility remain acceptance checks.
