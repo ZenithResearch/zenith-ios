@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Let Hermes assign conversation titles — repeated New chat actions must not collide with its unique-title constraint.
+- Keep chat authentication and oversized-response diagnostics separate from Wallet recovery errors — make gateway problems actionable without exposing error bodies.
+
+
 ### Added
 
 - Add native text chat with a personal Hermes gateway over embedded Tailscale — let the iPhone converse with a normal Hermes profile while keeping its gateway key separate from Wallet custody.

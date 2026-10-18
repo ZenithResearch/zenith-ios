@@ -24,7 +24,10 @@ import ZenithKit
     task = Task { @MainActor in
       do { try await action(ticket) } catch {
         guard ticket == generation, !Task.isCancelled else { return }
-        if waitingForReply {
+        if error as? HermesChatError == .authentication {
+          ready = false
+          self.error = HermesChatError.authentication.localizedDescription
+        } else if waitingForReply {
           self.error = HermesChatError.uncertainDelivery.localizedDescription
         } else {
           self.error = error.localizedDescription

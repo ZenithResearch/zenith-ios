@@ -103,6 +103,7 @@ public final class HermesChatClient: Sendable {
       as WalletFailure
     {
       if error == .core("access_denied") { throw HermesChatError.authentication }
+      if error == .invalidFile { throw HermesChatError.invalidResponse }
       throw error
     }
   }
@@ -134,7 +135,7 @@ public final class HermesChatClient: Sendable {
       let session: Session
     }
     let response = try JSONDecoder().decode(
-      Result.self, from: await request("api/sessions", body: ["id": id, "title": "Zenith chat"]))
+      Result.self, from: await request("api/sessions", body: ["id": id]))
     guard response.session.id == id else { throw HermesChatError.invalidResponse }
   }
   public func history(sessionID: String) async throws -> HermesChatHistory {
