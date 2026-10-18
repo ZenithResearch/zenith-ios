@@ -79,6 +79,8 @@ public final class PrivateTransport: @unchecked Sendable {
   private let configurationProvider: @Sendable () async throws -> URLSessionConfiguration
   private let lanTrust: LANServerTrust?
   private let guardLock = NSLock()
+  private var requestTimeout: TimeInterval = 20
+  private var resourceTimeout: TimeInterval = 30
   private var generation = 0
   private var sessions: [UUID: URLSession] = [:]
   public init(configuration: URLSessionConfiguration = .ephemeral) {
@@ -87,9 +89,11 @@ public final class PrivateTransport: @unchecked Sendable {
   }
   /// Used by the private-network route. Failure must propagate; never retry
   /// with a default/direct session when this provider is unavailable.
-  public init(configurationProvider: @escaping @Sendable () async throws -> URLSessionConfiguration) {
+  public init(configurationProvider: @escaping @Sendable () async throws -> URLSessionConfiguration, requestTimeout: TimeInterval = 20, resourceTimeout: TimeInterval = 30) {
     lanTrust = nil
     self.configurationProvider = configurationProvider
+    self.requestTimeout = min(600, max(1, requestTimeout))
+    self.resourceTimeout = min(600, max(self.requestTimeout, resourceTimeout))
   }
   /// Trust is scoped to this reviewed LAN receiver, never installed system-wide.
   public init(workServer: WorkAccessConfiguration) throws {
@@ -137,8 +141,8 @@ public final class PrivateTransport: @unchecked Sendable {
     configuration.urlCredentialStorage = nil
     configuration.urlCache = nil
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-    configuration.timeoutIntervalForRequest = 20
-    configuration.timeoutIntervalForResource = 30
+    configuration.timeoutIntervalForRequest = requestTimeout
+    configuration.timeoutIntervalForResource = resourceTimeout
     let session = URLSession(configuration: configuration, delegate: RedirectBlocker(lanTrust: lanTrust), delegateQueue: nil)
     let id = UUID()
     try register(session, ticket: version, id: id)

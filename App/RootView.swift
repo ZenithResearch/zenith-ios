@@ -19,6 +19,7 @@ struct RootView: View {
           } else {
             TabView(selection: $destination) {
               NativeWorkView().tabItem { Label("Work", systemImage: "list.bullet") }.tag("work")
+              HermesChatView().tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }.tag("chat")
               WalletView().tabItem { Label("Wallet", systemImage: "wallet.pass") }.tag("wallet")
             }
           }

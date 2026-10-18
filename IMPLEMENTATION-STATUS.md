@@ -50,3 +50,9 @@ Validated public profiles in Zenith’s Documents folder appear as a Connect but
 PR #1 is merged. The follow-up native reader accepts the explicitly versioned v2 and v3 scope/result pairs. Modern connections use the monitor read endpoint for Todos, canonical progress, revision-bound pages, detail reads and permitted relationships. Older saved five-type connections retain their original transport. The consent screen shows operations and relationship types, in addition to resource/Arena scope and expiry.
 
 Wallet source pin, native ABI, recovery files, encrypted snapshot schema and issuer trust remain unchanged. New tests cross the actual native Rust approval/storage/signing boundary with disposable issuers and a stub HTTP receiver; Python-generated fixtures pin the real public Devgraph response shapes. No live receiver, credential, grant or phone installation changed. Physical-device acceptance and the native request/status flow for the newer shared approval inbox remain outstanding. See READ-COMPATIBILITY.md for exact coverage and limits.
+
+## Hermes Chat — build 15, October 17, 2026
+
+Adds a native Chat tab, a generic HTTPS gateway connection importer, device-only Keychain authorization, normal Hermes Sessions API calls and recovery of server history after unlock. Private routing reuses the embedded Tailscale session; an interrupted send is never retried automatically. Work/custody/recovery contracts remain unchanged.
+
+The actual Swift client passed an authenticated chat and history reload through the dedicated tailnet HTTPS gateway. Unit checks cover auth failures, redirect refusal, invalid profiles/session paths and filtering tool/system content. Simulator compilation passed. Signed-device build/install and physical connection/import/background/accessibility checks are recorded separately; no phone result is inferred from the Mac test. Streaming, voice, attachments and tool-approval screens are deferred. See HERMES-CHAT.md.

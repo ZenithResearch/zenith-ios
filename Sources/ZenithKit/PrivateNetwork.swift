@@ -87,11 +87,11 @@ public final class PrivateNetworkSession: ObservableObject {
     resumeRequested = false
     begin(interactive: false)
   }
-  public func transport() -> PrivateTransport {
+  public func transport(requestTimeout: TimeInterval = 20, resourceTimeout: TimeInterval = 30) -> PrivateTransport {
     let transport = PrivateTransport(configurationProvider: { [weak self] in
       guard let self else { throw PrivateNetworkError.disconnected }
       return try await self.configuration()
-    })
+    }, requestTimeout: requestTimeout, resourceTimeout: resourceTimeout)
     transports.removeAll { $0.value == nil }
     transports.append(WeakTransport(value: transport))
     return transport

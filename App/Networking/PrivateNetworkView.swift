@@ -6,6 +6,7 @@ typealias PrivateNetworkModel = PrivateNetworkSession
 
 /// One entry point, reused in setup and the saved server's Connection section.
 struct PrivateNetworkRow: View {
+  var explanation = "Join the network your server uses. Work access is approved separately."
   @EnvironmentObject private var network: PrivateNetworkModel
   @State private var managing = false
   @State private var browser: SignInPage?
@@ -38,7 +39,7 @@ struct PrivateNetworkRow: View {
       }
       if let message = network.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
     }.padding(.vertical, 4)
-    Text("Join the network your server uses. Work access is approved separately.")
+    Text(explanation)
       .font(.footnote).foregroundStyle(.secondary)
       .onAppear { if let url = network.authURL { browser = SignInPage(url: url) } }
       .onChange(of: network.authURL) { _, url in
@@ -62,12 +63,12 @@ struct PrivateNetworkRow: View {
             Section {
               Label("Private network connected", systemImage: "checkmark.shield")
               if let name = network.networkName { LabeledContent("Network", value: name) }
-              Text("Tailscale connects Work inside Zenith. Other apps use their own connections.")
+              Text("Work and Chat share this private connection inside Zenith. Other apps use their own connections.")
             }
             Section {
               Button("Disconnect Tailscale") { network.disconnect(); managing = false }
             } footer: {
-              Text("Pauses this app’s connection. Your server settings and read approval stay saved. Remove this device in the Tailscale admin console to revoke its network membership.")
+              Text("Pauses this app’s connection. Your saved server settings stay on this iPhone. Remove this device in the Tailscale admin console to revoke its network membership.")
             }
           }.navigationTitle("Private connection").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { managing = false } } }

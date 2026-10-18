@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add native text chat with a personal Hermes gateway over embedded Tailscale — let the iPhone converse with a normal Hermes profile while keeping its gateway key separate from Wallet custody.
+- Persist a pending-send marker and reload server conversation history — avoid automatically sending a prompt twice after locking or losing the connection.
+
+
+### Added
+
 - Accept explicitly versioned monitor read scopes alongside historical native connections — let Zenith read Todos, canonical progress, full details and permitted relationships using its existing Wallet core.
 
 ### Fixed
