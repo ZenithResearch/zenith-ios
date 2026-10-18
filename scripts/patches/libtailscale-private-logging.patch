@@ -1,0 +1,23 @@
+diff --git a/tailscale.go b/tailscale.go
+index ce7cb74..b7552b2 100644
+--- a/tailscale.go
++++ b/tailscale.go
+@@ -26,6 +26,7 @@ import (
+ 	"golang.org/x/sys/unix"
+ 	"tailscale.com/hostinfo"
+ 	"tailscale.com/ipn"
++	"tailscale.com/logtail"
+ 	"tailscale.com/tsnet"
+ 	"tailscale.com/types/logger"
+ )
+@@ -108,7 +109,9 @@ func TsnetNewServer() C.int {
+ 	}
+ 	sd := servers.next
+ 	servers.next++
+-	s := &server{s: &tsnet.Server{}}
++	// Embedded Wallet builds do not emit auth URLs or upload diagnostic logs.
++	logtail.Disable()
++	s := &server{s: &tsnet.Server{UserLogf: logger.Discard, Logf: logger.Discard}}
+ 	servers.m[sd] = s
+ 	return (C.int)(sd)
+ }

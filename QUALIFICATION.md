@@ -1,5 +1,11 @@
 # Qualification and release handoff
 
+## LAN addition — build 13
+
+The 47 native tests pass, including a real, credential-free HTTPS probe against the operator's LAN receiver and rejection of an incorrect certificate pin. Two Python producer tests verify public-only profile export and unsafe-input rejection. Signed iPhone and arm64 Simulator builds pass. The app includes Local Network permission copy and no broad ATS exceptions or bundled deployment settings. Installed server checks reject unauthenticated reads and expose no write/docs route; the existing Tailscale read endpoint remains protected.
+
+The isolated connection-only Simulator app rendered the LAN review and reached the real HTTPS receiver using the actual transport, without a wallet identity or credential. Build 13 was installed in place on the paired phone and a public LAN profile was added alongside its existing profile. Launch was blocked by the phone's locked screen. Physical iPhone LAN permission, read approval, first read, and switching back to Tailscale remain unconfirmed. The user reported the prior Tailscale flow working before this change. These results do not qualify the separate mutation-signing release gate. See [LAN setup and boundaries](LOCAL-NETWORK.md).
+
 Run against disposable identities, approved test trust, isolated receiver storage, and an explicitly configured build. Never reuse a live wallet or broaden production grants for a test.
 
 ## Source checks
@@ -39,8 +45,34 @@ Use an isolated test identity for destructive clean-install steps; do not erase 
 
 Five people unfamiliar with implementation try create/check, restore, connect and read. At least four complete each assigned journey without coaching. Everyone must understand that access is read-only and data alone cannot restore signing identity. Record confusion, changes and retests. A technical source review or prototype review is not this usability evidence.
 
-## Operator-authorized live read activation — October 13, 2026
+## Generic Work server setup — build 9
 
-The operator authorized a dedicated read issuer and private Tailscale receiver. Devgraph `3eea919`, secS `109c0be`, and Wallet `f654017` supply the installed path. Build 7 is signed and installed as an update, preserving the existing phone wallet. The approved policy is list/get only, all Arenas, unarchived concrete Work, and a one-hour credential. The main API remains healthy; unsigned requests to the new private HTTPS route return 401.
+The app accepts an administrator-provided HTTPS server origin and public issuer pin through a reviewed connection file or manual entry. In build 9, Tailscale was optional connection guidance; build 10 replaces that behavior with the enforced embedded route below. No Work server configuration is bundled, and unknown profile fields or credentials are rejected. A connection check carries no identity and cannot authorize reads. Saving/removing settings clears applicable local read authority so a new selection requires fresh approval. Existing bundled previews require explicit setup after upgrading.
 
-The phone must separately approve membership and the disclosed read connection. That first physical enrollment/read is still pending. Activation does not count as completing the destructive/disposable qualification matrix above, the broader mutation-signing chain, or App Store distribution. No graph migration or Work mutation was performed. Operator configurations, credential registries, keys, and local device evidence are excluded from this repository.
+Test empty setup, ordinary HTTPS and Tailscale choices, malformed/oversized/mismatched profiles, local persistence, stale replacements and removal. Verify that an unreachable server does not change saved settings, and that editing a URL cannot retain another receiver's authority. Inspect the final package for deployment configuration before distribution. On a real phone, separately qualify network setup, membership approval, exact read-scope approval and first read. Record installation-specific details only in ignored local evidence, never public source or release documents.
+
+## Embedded Tailscale — build 10
+
+- Source: 37 Swift tests pass, including 11 new private-network lifecycle/transport tests and the existing recovery/custody regressions.
+- Native dependency: pinned TailscaleKit iPhone and arm64 Simulator frameworks built; source patch and exact framework hashes recorded locally.
+- Simulator: real embedded node reached the official Tailscale sign-in page without the separate Tailscale app. Cancellation returned to the preserved setup. No account or tailnet was authorized during this check.
+- Signed iPhone build: build 10 verified and installed in place without removing Wallet storage. The user’s real tailnet sign-in/read result remains outstanding.
+- Pending physical-device gate: sign in, approve the app's node on the selected network, check server reachability, approve exact read scope, read a page, then background/lock/unlock and repeat. Include denial, expired/revoked device access, offline/cellular changes, largest Dynamic Type and VoiceOver.
+
+The minimum app OS is now iOS 18.1, matching the pinned framework. No system-wide VPN permission is requested. [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) records module and authority boundaries.
+
+## Connection setup clarity — build 11
+
+Connection-file import now appears first, the empty address field has an instructional placeholder, and manual verification settings remain collapsed. The sign-in status and action use distinct wording. No transport, trust, or credential behavior changed.
+
+- The isolated Simulator setup app built and launched; the direct/private selector, import placement, address prompt, and collapsed verification controls were visually checked.
+- The complete signed iPhone app built and passed signature verification. A package scan found no local Work deployment values or bundled Work configuration. Build 11 has not yet been installed on the phone.
+- The user confirmed that build 10 opens the sign-in page on the physical phone. Network enrollment, server reachability, and an approved read remain unverified.
+
+## Guided connection and biometric unlock — build 12
+
+- Source: 43 Swift tests pass. New tests cover bounded/validated profile discovery, stale selection, wrong-password rejection before saving, real Rust unlock from a test biometric store, wrong-identity rejection, cancelled/stale reads, failed/interrupted enrollment cleanup, and password fallback. Test doubles do not qualify Keychain access control.
+- Connection UI: the isolated Simulator app discovers an example profile, opens official Tailscale sign-in from one Connect tap, and preserves the selected server after cancellation. The complete app’s password-fallback layout was visually checked without entering credentials. Manual keys remain behind a separate form. No real credentials or private deployment profile are used in the UI fixture.
+- Compatibility: no snapshot, recovery, membership, read-credential or Rust/WASM ABI/schema change. The native repository accepts optional expected lifecycle/identity checks; existing password callers retain their behavior.
+- Device gate: opt in with the current wallet password; verify the actual Face ID prompt, lock/unlock, cancellation, app backgrounding, unavailable/locked biometrics, and password fallback. On a disposable device/identity, change biometric enrollment and remove the device passcode; the saved item must no longer unlock. Disable biometrics and confirm Keychain removal without changing the wallet. Verify Password AutoFill with the person’s chosen manager separately.
+- Networking gate: tap the discovered server, complete sign-in, return to the preserved draft, save, review exact grants and read actual work. Discovery, network membership and server reachability must never be reported as granted read access.

@@ -2,15 +2,17 @@
 
 A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
 
-Status: published source, source checks passed, and signed build 7 installed on an operator-approved iPhone. The dedicated read receiver is live; the phone’s first approved enrollment/read is still pending. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
+Status: native preview with source checks and signed device builds. Work server setup is generic and stored only on the user's device; no deployment endpoint is built in. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
 
 ## Build
 
-Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. Minimum iOS is 17; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
+Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. The embedded TailscaleKit build requires iOS 18.1 or later; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 scripts/build-core.sh /absolute/path/to/castalia-wallet
+# With the pinned Go 1.27.2 toolchain on PATH:
+scripts/build-tailscale.sh
 xcodegen generate
 swift test
 xcodebuild -project Zenith.xcodeproj -scheme Zenith \
@@ -51,7 +53,7 @@ The phone has its own wallet storage. Installing the app does not copy Simulator
 - Membership and Work access are distinct, explicit choices. A restored membership proof remains inactive. Restored data never reinstates a read credential.
 - Work presents bounded pages and one type filter; the search is explicitly over loaded work. Unknown legacy progress is “Progress not recorded.” The receiver's legacy read projection currently admits Proposal, Initiative, Project, Issue, and Task; base Todo and canonical progress require a later delegated-read contract extension, not inferred lifecycle values.
 
-The interface uses native forms, lists, file pickers, a scrolling welcome screen, adaptive accent color, public detail disclosure, and a privacy cover while inactive. A saved file-selection may survive in memory as encrypted bytes; passwords and previews do not survive locking.
+The interface uses native forms, lists, file pickers, a scrolling welcome screen, adaptive accent color, public detail disclosure, and a privacy cover while inactive. A saved file-selection may survive in memory as encrypted bytes; password fields and previews are cleared on locking. Optional biometric unlock keeps a separately protected password in the device-only Keychain, as described below.
 
 ### Onboarding modules
 
@@ -62,19 +64,31 @@ The interface uses native forms, lists, file pickers, a scrolling welcome screen
 
 Each page has one next action. Alternative transfer methods are secondary; after selection they collapse to a file summary. The review page appears only after Rust validation. A successful encrypted restore satisfies the existing backup check; a new wallet must save and test its backup before proceeding.
 
+## Face ID and saved passwords
+
+Opt in through **Wallet → Unlock & security**, or choose **Use Face ID next time** while unlocking with the wallet password. Zenith verifies that password through the existing Rust core, authenticates with Face ID/Touch ID, and stores the password plus its matching public identity in a generic Keychain item protected by `biometryCurrentSet` and `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`. It is not synchronized to iCloud, copied to another device, exported, or stored in app preferences. The preference flag is only a UI hint and cannot authorize retrieval.
+
+Every biometric unlock uses a fresh LocalAuthentication context, then decrypts the same custody snapshot through Rust. No signing/approval gate is skipped. Backgrounding cancels authentication and invalidates pending work. Changed enrollment, cancellation, missing Keychain data, or lockout leaves password unlock available. **Turn off biometric unlock** deletes the saved Keychain password without changing custody. Keep the wallet password and encrypted recovery backup.
+
+Password fields support iOS Password AutoFill. People can separately save the password in Apple Passwords or another password manager; Zenith does not silently create a password-manager entry or claim domain-associated suggestions. See Apple’s [Keychain biometric access documentation](https://developer.apple.com/documentation/localauthentication/accessing-keychain-items-with-face-id-or-touch-id). Actual biometric enrollment and protected retrieval require physical-device qualification.
+
 ## Configuration and consent
 
-An unconfigured build intentionally offers setup-required states. Do not paste a local owner credential into the app or ship a test trust root.
+In **Work → Connection** (also **Wallet → Work access**), choose **Connect to [server]** when a valid connection file is found in Zenith’s Documents folder. For a private server, this button starts the embedded Tailscale sign-in. Instructions appear in the app; no separate Tailscale app is needed. After sign-in, **Continue to read access** saves the reviewed public server settings and, when membership is active, fetches the permission preview. Only **Allow read-only access** authorizes the disclosed scope. If membership is missing, the app directs the person to Membership and keeps the selected server.
 
-A distributor may supply **public proposed configuration** as `App/Membership.json` and `App/WorkAccess.json`, then regenerate the Xcode project. Loading either file does not approve it. The member must review and approve trust and read access in Wallet. Keep installation-specific configuration out of source control; record its public digest with the release evidence.
+If no file is present, choose **Choose connection file** or expand **Need help finding your server?** for Files/USB instructions. The administrator supplies the public issuer pin independently of enrollment. Manual address/key entry is a separate advanced screen. Merely discovering or importing a file never installs trust, sends identity, or grants access. Server identity and public-key details remain available in a disclosure before saving. There are no built-in private server names, addresses, or issuer keys.
+Settings stay in OS-protected Application Support, excluded from backups. Removing a server disconnects its local read authority. Adding a server always requires a fresh read approval, including when returning to a previously used address. A different issuer pin is never learned from an enrollment response. Builds exclude `App/WorkAccess.json`, even if someone has left an ignored copy locally. Existing preview users must explicitly set up their server after upgrading; prior bundled settings are not silently migrated.
 
-`Membership.json` has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
+A distributor may supply a **public proposed membership configuration** as `App/Membership.json`. It requires local approval and is separate from Work server setup. It has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
+
+Example administrator-provided Work connection file (placeholders only):
 
 ```json
 {
   "name": "Zenith work",
   "receiver": "https://your-approved-receiver.example",
   "issuer": "your-approved-issuer",
+  "network": "tailscale",
   "authority": {
     "issuer": "your-approved-issuer",
     "key_id": "your-approved-key-id",
@@ -85,11 +99,11 @@ A distributor may supply **public proposed configuration** as `App/Membership.js
 }
 ```
 
-The example is the shape of `WorkAccess.json`, not an enabled service. The public Devgraph candidate exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access. The native app displays the exact server, issuer, work scopes, archive visibility, and expiry before approval.
+The optional `network: "tailscale"` now selects an enforced embedded route. Existing files remain readable. **Connect to [server]** explicitly starts private sign-in; importing a file only prepares the review screen. Omit it for direct HTTPS. There is no fallback from Private to Direct. Connection files reject unknown fields, credential material, mismatched receiver/issuer values and unsupported networks. They are limited to 16 KiB. The public Devgraph receiver exposes an explicit `create_signed_read_app` composition with independently configured membership verification, read policy, graph storage, audit log and private enrollment database. See its `docs/native-signed-read.md`. Provisioning requires an active, trusted membership and a fresh proof of possession; membership alone grants no work access.
 
 The issuer public key must be supplied independently of the enrollment response. The shared Rust core validates the signed credential and signs a fresh holder proof for each read. Old bearer-only Work configurations fail setup.
 
-Read credentials are encrypted in the local snapshot and excluded from portable backups. URLSession is ephemeral, uses HTTPS, has no cookie/cache storage, rejects redirects, and bounds responses. Disconnect removes local access; server-side installation revocation is a separate operator action. No mutation client is included.
+Read credentials are encrypted in the local snapshot and excluded from portable backups. URLSession is ephemeral, uses HTTPS, has no cookie/cache storage, rejects redirects, and bounds responses. **Remove read access** removes local authorization; **Disconnect Tailscale** only pauses networking; server-side installation revocation is a separate operator action. No mutation client is included.
 
 ## Custody and transaction boundaries
 
@@ -111,3 +125,7 @@ The shared core remains application-neutral. Its internal recovery/read-approval
 ## Licensing direction
 
 AGPL is the preferred direction for a future licensing review, as noted on October 12, 2026. This is not yet a relicensing decision: the AGPL version and affected repositories/crates remain to be confirmed. The previously approved MIT declarations remain current. Any migration should coordinate the native app, shared Wallet crates, public Web source snapshot, license notices, provenance and license checks so their declarations stay consistent.
+
+## Embedded private networking
+
+See [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) for the UX, lifecycle and qualification boundaries. TailscaleKit wraps pinned libtailscale and is confined to `App/Networking`; Wallet custody and signing still use the unchanged shared Rust core. `Dependencies.json`, the checked privacy patch and `Artifacts/tailscale-build.json` identify the native framework. No tailnet name, reusable join key, private hostname or operator issuer pin is bundled.

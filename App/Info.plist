@@ -22,6 +22,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan an encrypted recovery file from your laptop screen to import your wallet offline.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Unlock your Zenith wallet using Face ID instead of typing its password.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connect to your chosen work server on the same Wi-Fi network.</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UTExportedTypeDeclarations</key>

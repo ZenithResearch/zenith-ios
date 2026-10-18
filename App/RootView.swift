@@ -37,6 +37,7 @@ struct RootView: View {
       }
     }.onChange(of: model.state?.unlocked) { _, unlocked in
       if unlocked == true && model.state?.backupVerified != true { destination = "wallet" }
+      else if unlocked == true && model.workDraft.active { destination = "work" }
     }
   }
 }
@@ -105,26 +106,6 @@ private struct WalletStartChoice: View {
       .accessibilityElement(children: .combine)
   }
 }
-struct UnlockView: View {
-  @EnvironmentObject private var model: WalletModel
-  @State private var password = ""
-  var body: some View {
-    NavigationStack {
-      Form {
-        Section { SecureField("Wallet password", text: $password).textContentType(.password) }
-        Section {
-          Button("Unlock") {
-            let value = password
-            password = ""
-            model.perform({ try await $0.unlock(password: value) }) { _ in }
-          }.buttonStyle(.borderedProminent).disabled(password.isEmpty || model.busy)
-          Feedback()
-        }
-      }.navigationTitle("Unlock your wallet")
-        .onChange(of: model.generation) { _, _ in password = "" }
-    }
-  }
-}
 struct WalletView: View {
   @EnvironmentObject private var model: WalletModel
   @State private var connected = false
@@ -160,6 +141,7 @@ struct WalletView: View {
             Text("Castalia Member Key").font(.caption).foregroundStyle(.secondary)
             Text(model.state?.publicKey ?? "").font(.caption.monospaced()).textSelection(.enabled)
           }
+          NavigationLink("Unlock & security") { WalletSecurityView() }
           Button("Lock wallet", systemImage: "lock") { model.suspend() }
         }
         Section { Feedback() }

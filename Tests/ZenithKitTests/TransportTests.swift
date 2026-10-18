@@ -33,6 +33,11 @@ final class TransportTests: XCTestCase {
       "receiver":"https://example.test", "audience":"devgraph"]]
     let config = try JSONDecoder().decode(WorkAccessConfiguration.self, from: JSONSerialization.data(withJSONObject: value))
     XCTAssertNoThrow(try config.validate())
+    XCTAssertNil(config.network)
+    value["network"] = "tailscale"
+    let privateConfig = try JSONDecoder().decode(WorkAccessConfiguration.self, from: JSONSerialization.data(withJSONObject: value))
+    XCTAssertEqual(privateConfig.network, .tailscale)
+    XCTAssertNoThrow(try privateConfig.validate())
     value["receiver"] = "https://other.test"
     let wrong = try JSONDecoder().decode(WorkAccessConfiguration.self, from: JSONSerialization.data(withJSONObject: value))
     XCTAssertThrowsError(try wrong.validate())
@@ -82,4 +87,46 @@ final class TransportTests: XCTestCase {
     let grant = try JSONDecoder().decode(WorkReadGrant.self, from: data)
     XCTAssertThrowsError(try grant.validate())
   }
+  func testConnectionProbeSendsNoIdentityOrCredential() async throws {
+    ResponseProtocol.guardLock.lock()
+    ResponseProtocol.handler = { request in
+      XCTAssertEqual(request.url?.absoluteString, "https://example.test/devgraph/native-read/v2/requests")
+      XCTAssertEqual(request.httpMethod, "POST")
+      XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+      XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+      var body = request.httpBody ?? Data()
+      if let stream = request.httpBodyStream {
+        stream.open(); defer { stream.close() }
+        var buffer = [UInt8](repeating: 0, count: 64)
+        let count = stream.read(&buffer, maxLength: buffer.count)
+        if count > 0 { body = Data(buffer.prefix(count)) }
+      }
+      XCTAssertEqual(body, Data("{}".utf8))
+      return (401, Data(#"{"error":"access_denied"}"#.utf8))
+    }
+    ResponseProtocol.guardLock.unlock()
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [ResponseProtocol.self]
+    try await PrivateTransport(configuration: configuration).checkReadReceiver(at: URL(string: "https://example.test")!)
+  }
+  func testConnectionProbeRejectsWrongServiceRedirectAndOversizedResponse() async throws {
+    for (status, body) in [(200, Data()), (302, Data()), (503, Data()),
+      (401, Data(#"{"error":"other_service"}"#.utf8)), (401, Data(repeating: 65, count: 1025))] {
+      do {
+        try await transport(status: status, data: body).checkReadReceiver(at: URL(string: "https://example.test")!)
+        XCTFail("Unexpected probe success for \(status)")
+      } catch { XCTAssertTrue(error is WalletFailure) }
+    }
+  }
+  func testNetworkGuidanceDoesNotMisdiagnoseTLSOrCancellation() {
+    let timeout = WorkConnectionFailure(code: .timedOut, network: .tailscale)
+    XCTAssertTrue(timeout.localizedDescription.contains("through Tailscale"))
+    let publicTimeout = WorkConnectionFailure(code: .timedOut, network: nil)
+    XCTAssertFalse(publicTimeout.localizedDescription.contains("Tailscale"))
+    let certificate = WorkConnectionFailure(code: .serverCertificateUntrusted, network: .tailscale)
+    XCTAssertTrue(certificate.localizedDescription.contains("could not be verified"))
+    let cancelled = WorkConnectionFailure(code: .cancelled, network: .tailscale)
+    XCTAssertFalse(cancelled.localizedDescription.contains("Can’t reach"))
+  }
+
 }
