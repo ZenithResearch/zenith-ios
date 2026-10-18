@@ -1,6 +1,6 @@
 # Zenith iOS preview
 
-A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
+A greenfield, native SwiftUI app with **Work**, **Chat**, and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
 
 Status: native preview with source checks and signed device builds. Work server setup is generic and stored only on the user's device; no deployment endpoint is built in. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
 
@@ -41,6 +41,10 @@ xcrun devicectl device process launch --device "$ZENITH_PHONE_UDID" \
 Use the selected phone's identifier and approved team ID for these variables. A certificate alone is insufficient when the matching provisioning profile is absent. If installation or launch requests device-side setup, complete it on the phone before retrying. Never uninstall the app to work around signing or launch errors: that can remove wallet storage.
 
 The phone has its own wallet storage. Installing the app does not copy Simulator custody. Create a disposable wallet or explicitly restore its encrypted recovery file through the app. Membership and work access still require the separate configuration and approval below. Successful installation is not completion of the physical-device qualification checklist.
+
+## Hermes chat
+
+Chat connects to a personal Hermes gateway over the existing embedded Tailscale connection. It uses Hermes's authenticated Sessions API, keeps the gateway key in the device-only Keychain, and reloads server-side conversation history. See [Hermes chat](HERMES-CHAT.md) for setup, interrupted-send behavior and qualification.
 
 ## Product behavior
 

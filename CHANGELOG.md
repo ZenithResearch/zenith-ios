@@ -4,6 +4,22 @@
 
 ### Added
 
+- Add explicit Tailscale auth-key enrollment with secure entry or a bounded text-file import in the shared Work/Chat connection screen. Keep browser sign-in and existing saved device identities; never replay enrollment keys on foreground resume. Development build 16.
+
+### Fixed
+
+- Let Hermes assign conversation titles — repeated New chat actions must not collide with its unique-title constraint.
+- Keep chat authentication and oversized-response diagnostics separate from Wallet recovery errors — make gateway problems actionable without exposing error bodies.
+
+
+### Added
+
+- Add native text chat with a personal Hermes gateway over embedded Tailscale — let the iPhone converse with a normal Hermes profile while keeping its gateway key separate from Wallet custody.
+- Persist a pending-send marker and reload server conversation history — avoid automatically sending a prompt twice after locking or losing the connection.
+
+
+### Added
+
 - Accept explicitly versioned monitor read scopes alongside historical native connections — let Zenith read Todos, canonical progress, full details and permitted relationships using its existing Wallet core.
 
 ### Fixed

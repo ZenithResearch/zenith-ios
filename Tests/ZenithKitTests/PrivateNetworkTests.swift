@@ -47,6 +47,9 @@ private func interceptedConfiguration() -> URLSessionConfiguration {
 private actor FakePrivateNetworkDriver: PrivateNetworkDriver {
   private var current: PrivateNetworkStatus
   private(set) var starts: [Bool] = []
+  private(set) var enrollments = 0
+  private(set) var submittedKey: String?
+  private var rejectEnrollment = false
   private(set) var stops = 0
   private(set) var statusCalls = 0
   private(set) var configurationCalls = 0
@@ -57,6 +60,12 @@ private actor FakePrivateNetworkDriver: PrivateNetworkDriver {
 
   init(status: PrivateNetworkStatus) { current = status }
   func start(interactive: Bool) async throws { starts.append(interactive) }
+  func enroll(authKey: String) async throws {
+    enrollments += 1
+    submittedKey = authKey
+    if rejectEnrollment { throw NSError(domain: "upstream secret: " + authKey, code: 1) }
+  }
+  func rejectNextEnrollment() { rejectEnrollment = true }
   func stop() async { stops += 1 }
   func status() async throws -> PrivateNetworkStatus {
     statusCalls += 1
@@ -111,6 +120,78 @@ final class PrivateNetworkTests: XCTestCase {
   override func tearDown() {
     URLProtocol.unregisterClass(PrivateNetworkResponseProtocol.self)
     super.tearDown()
+  }
+
+  func testEnrollmentAdmissionRejectsOtherSecretsAndOversizedFiles() throws {
+    let key = "tskey-auth-0123456789ABCDEF-0123456789abcdef0123456789abcdef"
+    XCTAssertEqual(try TailscaleEnrollment.validatedKey("  " + key + "\n"), key)
+    XCTAssertEqual(try TailscaleEnrollment.importKey(Data((key + "\n").utf8)), key)
+    for value in ["", "tskey-auth-short", "tskey-api-" + String(repeating: "a", count: 50),
+      "tskey-client-" + String(repeating: "a", count: 50), key + "\ninjected", key + "?x=1",
+      "tskey-auth-" + String(repeating: "a", count: 513)] {
+      XCTAssertThrowsError(try TailscaleEnrollment.validatedKey(value)) {
+        XCTAssertEqual($0 as? PrivateNetworkError, .invalidAuthKey)
+      }
+    }
+    XCTAssertThrowsError(try TailscaleEnrollment.importKey(Data(repeating: 65, count: 1025)))
+    XCTAssertThrowsError(try TailscaleEnrollment.importKey(Data([0xff, 0xfe])))
+    XCTAssertThrowsError(try TailscaleEnrollment.importKey(Data(#"{"key":"gateway-secret"}"#.utf8)))
+  }
+
+  @MainActor
+  func testEnrollmentResumesSavedIdentityWithoutReplayingKey() async throws {
+    let driver = FakePrivateNetworkDriver(status: try networkStatus("Running"))
+    let session = PrivateNetworkSession(driver: driver)
+    let key = "tskey-auth-0123456789ABCDEF-0123456789abcdef0123456789abcdef"
+    try session.enroll(authKey: key)
+    await eventually { session.phase == .connected }
+    let submitted = await driver.submittedKey
+    XCTAssertEqual(submitted, key)
+    session.suspend()
+    session.resume()
+    await eventually { session.phase == .connected }
+    let starts = await driver.starts
+    let enrollments = await driver.enrollments
+    XCTAssertEqual(starts, [false])
+    XCTAssertEqual(enrollments, 1)
+    session.disconnect()
+  }
+
+  @MainActor
+  func testEnrollmentNeverExposesBrowserFallbackAndCancellationDoesNotReplay() async throws {
+    let driver = FakePrivateNetworkDriver(status: try networkStatus(
+      "NeedsLogin", authURL: "https://login.tailscale.com/a/not-for-key-enrollment"))
+    let session = PrivateNetworkSession(driver: driver)
+    try session.enroll(authKey: "tskey-auth-0123456789ABCDEF-0123456789abcdef0123456789abcdef")
+    await eventually { await driver.statusCalls > 0 }
+    XCTAssertEqual(session.phase, .connecting)
+    XCTAssertNil(session.authURL)
+    session.cancelSignIn()
+    session.resume()
+    await eventually { await driver.stops >= 3 }
+    let starts = await driver.starts
+    let enrollments = await driver.enrollments
+    XCTAssertTrue(starts.isEmpty)
+    XCTAssertEqual(enrollments, 1)
+    XCTAssertEqual(session.phase, .idle)
+  }
+
+  @MainActor
+  func testEnrollmentFailureRedactsUpstreamErrorAndInvalidInputDoesNotDisconnect() async throws {
+    let driver = FakePrivateNetworkDriver(status: try networkStatus("Running"))
+    let session = PrivateNetworkSession(driver: driver)
+    session.connect()
+    await eventually { session.phase == .connected }
+    let generation = session.generation
+    XCTAssertThrowsError(try session.enroll(authKey: "wrong-token"))
+    XCTAssertEqual(session.phase, .connected)
+    XCTAssertEqual(session.generation, generation)
+    await driver.rejectNextEnrollment()
+    try session.enroll(authKey: "tskey-auth-0123456789ABCDEF-0123456789abcdef0123456789abcdef")
+    await eventually { session.phase == .failed }
+    XCTAssertEqual(session.message, PrivateNetworkError.enrollmentFailed.localizedDescription)
+    XCTAssertFalse(session.message?.contains("tskey") ?? true)
+    session.disconnect()
   }
 
   func testSignInRejectsUntrustedURLs() throws {
