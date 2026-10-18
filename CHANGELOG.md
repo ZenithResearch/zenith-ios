@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- Accept explicitly versioned monitor read scopes alongside historical native connections — let Zenith read Todos, canonical progress, full details and permitted relationships using its existing Wallet core.
+
+### Fixed
+
+- Follow server revision/cursor pagination and decode canonical string metadata — avoid missing modern pages or presenting a list summary as a complete item.
+- Disclose granted operations and relationship types before read approval — keep native consent aligned with the exact issuer permissions.
+
+
 ### Fixed
 
 - Add generic, device-local Work server setup with HTTPS address entry, optional Tailscale guidance, an anonymous connection check, and reviewed public issuer settings. Exclude Work configuration from builds; require explicit setup and fresh read approval after upgrading from a bundled preview. Development build 9.
