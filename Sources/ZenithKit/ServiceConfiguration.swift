@@ -173,7 +173,7 @@ public final class PrivateTransport: @unchecked Sendable {
       value == ["error": "access_denied"]
     else { throw WalletFailure.core("invalid_response") }
   }
-  public func request(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
+  public func request(_ request: URLRequest, maximum: Int = 1_048_576, viewChangedOnConflict: Bool = false) async throws -> Data {
     if let lanTrust, request.url.map({ !lanTrust.permits($0) }) ?? true {
       throw WalletFailure.core("service_setup_required")
     }
@@ -187,6 +187,9 @@ public final class PrivateTransport: @unchecked Sendable {
     }
     if response.statusCode == 401 || response.statusCode == 403 {
       throw WalletFailure.core("access_denied")
+    }
+    if response.statusCode == 409 && viewChangedOnConflict {
+      throw WalletFailure.core("work_view_changed")
     }
     guard (200..<300).contains(response.statusCode) else {
       throw WalletFailure.core("service_rejected_request")

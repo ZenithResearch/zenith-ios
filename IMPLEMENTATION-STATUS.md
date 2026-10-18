@@ -9,7 +9,7 @@ Updated October 13, 2026. Published native preview source. Generic server setup 
 - Offline QR transfer carries the encrypted file itself; the Mac companion and USB/Files routes feed the same validated import flow. Existing wallets cannot be replaced.
 - `Dependencies.json` pins Wallet `f654017`. The builder checks the revision and relevant source cleanliness. Work server address and issuer pins are supplied and approved locally. No Work deployment configuration is bundled.
 - Devgraph issues a signed read credential under explicit operator policy. secS verifies issuer signature, holder proof, expiry, exact operation, and current registry status. Devgraph consumes replay nonces and applies resource/Arena restrictions before pagination.
-- Read permissions cover the five concrete Work types: Proposal, Initiative, Project, Issue, and Task. Base Todo and canonical progress are not exposed by the existing delegated projection; absent progress is shown as “Progress not recorded.”
+- Legacy connections retain the five-type reader. The October 17 adapter also accepts explicitly versioned monitor scopes for Todo, canonical progress and permitted relationships; missing progress remains “Progress not recorded.”
 
 ## Evidence
 
@@ -44,3 +44,9 @@ Work connection now offers Direct or Private via Tailscale. The private route us
 Validated public profiles in Zenith’s Documents folder appear as a Connect button. In-app instructions cover missing files, network login, and separate read approval. Optional Face ID/Touch ID saves the verified wallet password in a device-only, current-biometric-set Keychain item. The shared Rust custody and signing contracts remain unchanged; Swift adds lifecycle and identity checks around unlocking. Password AutoFill and ordinary password unlock remain available.
 
 43 Swift tests pass, including six added discovery/biometric-coordination tests. The real Keychain adapter builds in the signed iPhone app; synthetic storage tests are not qualification of physical Face ID. First device enrollment/unlock, biometric changes/lockout, and the end-to-end private read remain outstanding until exercised on-device.
+
+## Monitor read compatibility — October 17, 2026
+
+PR #1 is merged. The follow-up native reader accepts the explicitly versioned v2 and v3 scope/result pairs. Modern connections use the monitor read endpoint for Todos, canonical progress, revision-bound pages, detail reads and permitted relationships. Older saved five-type connections retain their original transport. The consent screen shows operations and relationship types, in addition to resource/Arena scope and expiry.
+
+Wallet source pin, native ABI, recovery files, encrypted snapshot schema and issuer trust remain unchanged. New tests cross the actual native Rust approval/storage/signing boundary with disposable issuers and a stub HTTP receiver; Python-generated fixtures pin the real public Devgraph response shapes. No live receiver, credential, grant or phone installation changed. Physical-device acceptance and the native request/status flow for the newer shared approval inbox remain outstanding. See READ-COMPATIBILITY.md for exact coverage and limits.

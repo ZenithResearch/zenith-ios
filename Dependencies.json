@@ -12,7 +12,12 @@
   "read_contract": {
     "credential": "castalia.read-credential.v1",
     "presentation": "castalia.read-presentation.v1",
-    "transport": "devgraph.native-read.v2"
+    "transport": "devgraph.native-read.v2",
+    "scope_versions": [
+      "devgraph.native-read-scope.v2",
+      "devgraph.native-read-scope.v3"
+    ],
+    "monitor_endpoint": "/monitor/wallet-access/v1/requests"
   },
   "tailscale": {
     "repository": "https://github.com/tailscale/libtailscale",

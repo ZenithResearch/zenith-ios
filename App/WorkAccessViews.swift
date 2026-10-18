@@ -32,6 +32,10 @@ struct WorkAccessView: View {
               LabeledContent("Expires", value: proposal.expires.formatted())
               ForEach(Array(proposal.grants.enumerated()), id: \.offset) { _, grant in
                 Text(grant.work_kinds.joined(separator: ", "))
+                Text("Actions: " + grant.operations.joined(separator: ", "))
+                if grant.operations.contains("relationships") {
+                  Text("Related work: " + grant.relationship_types.joined(separator: ", "))
+                }
                 if let arenas = grant.arena_ids {
                   Text("Arenas: " + arenas.joined(separator: ", "))
                 } else {
@@ -158,9 +162,10 @@ struct NativeWorkView: View {
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @State private var client: DevgraphReadClient?
   @State private var rows: [WorkRecord] = []
-  @State private var cursors: [String: String] = [:]
+  @State private var cursors: [String: WorkPageCursor] = [:]
   @State private var finished: Set<String> = []
   @State private var allowed: [String] = []
+  @State private var detailKinds: Set<String> = []
   @State private var error: String?
   @State private var loading = false
   @State private var filters = false
@@ -189,14 +194,7 @@ struct NativeWorkView: View {
         }
         ForEach(visible, id: \.rowID) { row in
           NavigationLink {
-            ScrollView {
-              VStack(alignment: .leading, spacing: 16) {
-                Text(row.kind).foregroundStyle(.secondary)
-                Text(row.title).font(.title2).bold()
-                Text(row.progressLabel).font(.subheadline)
-                Text(row.description).textSelection(.enabled)
-              }.frame(maxWidth: .infinity, alignment: .leading).padding()
-            }.navigationTitle("Work item").navigationBarTitleDisplayMode(.inline)
+            NativeWorkDetailView(row: row, canRead: detailKinds.contains(row.kind))
           } label: {
             VStack(alignment: .leading, spacing: 4) {
               Text(row.title)
@@ -243,6 +241,7 @@ struct NativeWorkView: View {
           cursors = [:]
           finished = []
           allowed = []
+          detailKinds = []
           error = nil
           client = workClient(model)
           loading = false
@@ -250,6 +249,7 @@ struct NativeWorkView: View {
           do {
             if let manifest = try await client?.manifest() {
               guard !Task.isCancelled, version == model.generation else { return }
+              detailKinds = Set(manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
               allowed = Array(
                 Set(
                   manifest.read_grants.filter { $0.operations.contains("list") }.flatMap(
@@ -292,21 +292,19 @@ struct NativeWorkView: View {
     defer { if current() { loading = false } }
     do {
       for type in allowed where !finished.contains(type) {
-        let page = try await client.list(kind: type, after: cursors[type])
+        let page = try await client.page(kind: type, after: cursors[type])
         guard current(), !Task.isCancelled else { return }
-        if page.count < 20 { finished.insert(type) }
-        if let last = page.last {
-          guard last.id != cursors[type] else { throw WalletFailure.core("invalid_response") }
-          cursors[type] = last.id
-        }
+        if let next = page.next { cursors[type] = next }
+        else { finished.insert(type) }
         let existing = Set(rows.map(\.rowID))
-        rows.append(contentsOf: page.filter { !existing.contains($0.rowID) })
+        guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else {
+          throw WalletFailure.core("invalid_response")
+        }
+        rows.append(contentsOf: page.items)
       }
     } catch {
       if current() {
-        if let failure = error as? WalletFailure,
-          failure == .core("access_denied") || failure == .core("access_expired")
-        {
+        if invalidatesWorkAccess(error) {
           rows = []
           cursors = [:]
           finished = []
@@ -314,6 +312,140 @@ struct NativeWorkView: View {
         }
         self.error = error.localizedDescription
       }
+    }
+  }
+}
+
+/// Fetch details through the granted get operation. Modern lists intentionally
+/// omit descriptions; a list result must never be presented as a complete item.
+struct NativeWorkDetailView: View {
+  let row: WorkRecord
+  let canRead: Bool
+  @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
+  @State private var record: WorkRecord?
+  @State private var client: DevgraphReadClient?
+  @State private var error: String?
+  @State private var relationships: [String] = []
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 16) {
+        if let record {
+          Text(record.kind).foregroundStyle(.secondary)
+          Text(record.title).font(.title2.bold())
+          Text(record.progressLabel).font(.subheadline)
+          Text(record.description).textSelection(.enabled)
+          if !canRead { Text("Your access includes this summary. Full item details need separate read permission.").font(.footnote) }
+          ForEach(relationships, id: \.self) { relationship in
+            NavigationLink(relationshipTitle(relationship)) {
+              NativeRelatedWorkView(anchor: record, relationship: relationship)
+            }
+          }
+        } else if let error {
+          Text(error)
+        } else { ProgressView("Loading item") }
+      }.frame(maxWidth: .infinity, alignment: .leading).padding()
+    }.navigationTitle("Work item").navigationBarTitleDisplayMode(.inline)
+      .task(id: model.generation) {
+        record = nil; error = nil; relationships = []; client?.cancel()
+        client = workClient(model)
+        let version = model.generation
+        do {
+          guard let client else { throw WalletFailure.core("access_setup_required") }
+          let manifest = try await client.manifest()
+          let permitted = manifest.read_grants.filter { $0.operations.contains("relationships") && $0.work_kinds.contains(row.kind) }
+          let loaded = canRead ? try await client.get(kind: row.kind, id: row.id) : row
+          guard !Task.isCancelled, version == model.generation else { return }
+          record = loaded
+          relationships = Array(Set(permitted.flatMap(\.relationship_types))).sorted()
+        } catch {
+          guard !Task.isCancelled, version == model.generation else { return }
+          self.error = error.localizedDescription
+        }
+      }
+      .onChange(of: privateNetwork.generation) { _, _ in
+        if model.workServer?.network == .tailscale {
+          client?.cancel(); record = nil
+          error = "Private connection changed. Return to Work and reconnect."
+        }
+      }
+      .onDisappear { client?.cancel(); record = nil }
+  }
+}
+
+private func relationshipTitle(_ relationship: String) -> String {
+  ["children": "Children", "parent": "Parent", "dependencies": "Depends on",
+   "dependents": "Used by", "blocked": "Blocks", "blockers": "Blocked by"][relationship] ?? "Related work"
+}
+private func invalidatesWorkAccess(_ error: Error) -> Bool {
+  guard let failure = error as? WalletFailure, case .core(let code) = failure else { return false }
+  return ["access_denied", "access_expired", "access_setup_required", "membership_required",
+    "invalid_read_authority", "read_not_permitted", "issuer_setup_required"].contains(code)
+}
+struct NativeRelatedWorkView: View {
+  let anchor: WorkRecord
+  let relationship: String
+  @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
+  @State private var rows: [WorkRecord] = []
+  @State private var client: DevgraphReadClient?
+  @State private var cursor: WorkPageCursor?
+  @State private var finished = false
+  @State private var loading = false
+  @State private var detailKinds: Set<String> = []
+  @State private var error: String?
+  var body: some View {
+    List {
+      ForEach(rows, id: \.rowID) { row in
+        NavigationLink {
+          NativeWorkDetailView(row: row, canRead: detailKinds.contains(row.kind))
+        } label: {
+          VStack(alignment: .leading) {
+            Text(row.title)
+            Text(row.kind + " · " + row.progressLabel).font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      }
+      if loading { ProgressView("Loading related work") }
+      else if let error { Text(error) }
+      else if rows.isEmpty { Text("No related work is visible within your access.") }
+      if !finished && !loading && error == nil { Button("Load more") { Task { await loadMore() } } }
+    }.navigationTitle(relationshipTitle(relationship))
+      .task(id: model.generation) {
+        client?.cancel(); rows = []; cursor = nil; finished = false; loading = false; error = nil
+        client = workClient(model)
+        await loadMore()
+      }
+      .onChange(of: privateNetwork.generation) { _, _ in
+        if model.workServer?.network == .tailscale {
+          client?.cancel(); rows = []; loading = false
+          error = "Private connection changed. Return to Work and reconnect."
+        }
+      }
+      .onDisappear { client?.cancel() }
+  }
+  private func loadMore() async {
+    guard !loading, !finished, let client else { return }
+    loading = true; error = nil
+    let version = model.generation
+    let networkVersion = privateNetwork.generation
+    func current() -> Bool {
+      version == model.generation && (client.connection.network != .tailscale || networkVersion == privateNetwork.generation)
+    }
+    defer { if current() { loading = false } }
+    do {
+      let manifest = try await client.manifest()
+      let page = try await client.related(kind: anchor.kind, id: anchor.id, relationship: relationship, after: cursor)
+      guard current(), !Task.isCancelled else { return }
+      detailKinds = Set(manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
+      let existing = Set(rows.map(\.rowID))
+      guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else { throw WalletFailure.core("invalid_response") }
+      rows.append(contentsOf: page.items)
+      cursor = page.next; finished = page.next == nil
+    } catch {
+      guard current(), !Task.isCancelled else { return }
+      if invalidatesWorkAccess(error) { rows = []; finished = true }
+      self.error = error.localizedDescription
     }
   }
 }

@@ -33,6 +33,8 @@ public enum WalletFailure: Error, Equatable, LocalizedError {
       case "issuer_setup_required": return "The access provider has changed. An updated connection configuration is needed."
       case "invalid_response", "invalid_credential", "invalid_read_challenge":
         return "The service returned an unexpected response. No connection was saved."
+      case "work_view_changed": return "Work changed while loading. Return to Work and pull to refresh before loading more."
+      case "unsupported_read_scope": return "Your current access does not include this kind of work or action."
       case "service_rejected_request":
         return "The service could not complete this request. Try again later."
       case "recovery_file_invalid", "unlock_failed":
