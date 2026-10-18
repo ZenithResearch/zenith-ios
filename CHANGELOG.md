@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add explicit Tailscale auth-key enrollment with secure entry or a bounded text-file import in the shared Work/Chat connection screen. Keep browser sign-in and existing saved device identities; never replay enrollment keys on foreground resume. Development build 16.
+
 ### Fixed
 
 - Let Hermes assign conversation titles — repeated New chat actions must not collide with its unique-title constraint.

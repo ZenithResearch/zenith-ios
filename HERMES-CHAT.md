@@ -44,3 +44,13 @@ Swift tests cover authenticated session calls, mixed-type capability flags, filt
 Set `HERMES_CHAT_TEST_PROFILE` to an explicitly selected private connection file to run the optional real gateway test. It creates a disposable server conversation, asks for a harmless fixed reply without tools, and verifies history through the actual Swift client. No connection key is logged or stored in test artifacts. Without that explicit input the live check is skipped.
 
 Record source and build hashes separately from gateway and iPhone results. A successful native Swift HTTPS test is not physical-device or embedded Tailscale enrollment evidence. Phone import, Keychain access, real private routing, background/resume and accessibility remain device checks.
+
+## Tailscale auth-key enrollment — build 16
+
+In Chat → Connection (or Work → Connection), choose **Sign in with an auth key** in the Tailscale section. Paste a `tskey-auth-…` key, or choose a text file containing only the key, then choose **Enroll this iPhone**. Obtain a one-time key from your tailnet administrator with Reusable off and Ephemeral off; a pre-approved key skips device approval where permitted. Zenith cannot determine those server-side key settings from the opaque key. Device approval and Tailnet Lock policies still apply.
+
+This enrolls the existing installation-local Tailscale node using the official control plane. It does not switch an already-authorized node to another account. Existing browser sign-in, saved Work/Hermes connection files, custody and grants remain compatible. No control-plane address or key is bundled. Tailscale API tokens, OAuth secrets and the Hermes gateway key are not enrollment keys. The imported file is bounded to 1 KiB; keys are validated before interrupting an existing connection.
+
+The form clears its input on submit, dismissal and inactivity. The enrollment key is passed transiently to the embedded Tailscale runtime and is not stored in Zenith preferences, Keychain, Wallet backups or logs. Its lifetime inside the native runtime lasts until that node is closed. Saved protected Tailscale device state supplies future reconnects; foreground resume never resubmits the enrollment key. A failed or interrupted attempt requires deliberate resubmission, and a consumed one-time key may need replacing. The source file, if used, remains in Files for the user to remove. Auth-key expiry is separate from device-key expiry.
+
+Validation includes parser bounds/token rejection and network lifecycle tests for key-only enrollment, cancellation, error redaction, and saved-identity resume without replay. Actual tailnet enrollment requires a valid administrator-supplied key and physical-device acceptance.
