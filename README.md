@@ -133,3 +133,20 @@ AGPL is the preferred direction for a future licensing review, as noted on Octob
 ## Embedded private networking
 
 See [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) for the UX, lifecycle and qualification boundaries. TailscaleKit wraps pinned libtailscale and is confined to `App/Networking`; Wallet custody and signing still use the unchanged shared Rust core. `Dependencies.json`, the checked privacy patch and `Artifacts/tailscale-build.json` identify the native framework. No tailnet name, reusable join key, private hostname or operator issuer pin is bundled.
+
+
+### Preset and dynamic-area requests (build 22)
+
+For a server running the opt-in Devgraph v7 grant runtime, **Request or check access**
+loads the server's published catalog. Choose **Contributor**, **Project Manager** or
+**No preset**, then include an Arena, Initiative or Project area. Multiple areas may
+be requested. The consent screen shows the exact preset reference and paths; the
+operator still chooses the final permissions. A path covers matching resources at
+each access, including future descendants and excluding objects moved outside it.
+
+The native client accepts explicitly versioned scoped-read credentials and preserves
+their paths through Wallet approval, encrypted storage, relaunch and signed reads.
+Existing servers and saved requests retain their original protocol. Unknown outcomes
+check the original ID; **Request different access** is offered only after a known
+result, with the previous public request archived. A new client installation does
+not activate server grants or extend an expired test window.

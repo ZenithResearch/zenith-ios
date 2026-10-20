@@ -37,9 +37,13 @@ struct WorkAccessView: View {
                 if grant.operations.contains("relationships") {
                   Text("Related work: " + grant.relationship_types.joined(separator: ", "))
                 }
+                if let paths = grant.resource_paths {
+                  ForEach(paths, id: \.self) { path in Text("Path: " + path.summary) }
+                  Text("Evaluated at each access. New descendants are included; moved-out resources lose access.").font(.footnote)
+                }
                 if let arenas = grant.arena_ids {
                   Text("Arenas: " + arenas.joined(separator: ", "))
-                } else {
+                } else if grant.resource_paths == nil {
                   Text("All arenas")
                 }
                 if let ids = grant.work_ids {

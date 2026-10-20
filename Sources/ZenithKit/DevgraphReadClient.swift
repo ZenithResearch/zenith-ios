@@ -49,6 +49,8 @@ public struct WorkAccessConfiguration: Codable, Sendable, Hashable {
   }
 }
 public struct WorkReadGrant: Codable, Sendable, Equatable {
+  public let schema: String?
+  public let resource_paths: [WorkResourcePath]?
   public let scope: String
   public let operations: [String]
   public let relationship_types: [String]
@@ -57,6 +59,12 @@ public struct WorkReadGrant: Codable, Sendable, Equatable {
   public let arena_ids: [String]?
   public let include_archived: Bool
   func validate(protocol version: WorkReadProtocol = .nativeV2) throws {
+    if let paths = resource_paths {
+      guard version == .pathV4, schema == "devgraph.path-read-grant.v1", !paths.isEmpty,
+        paths.count <= 16, Set(paths).count == paths.count else { throw WalletFailure.core("unsupported_read_scope") }
+      for path in paths { try path.validate() }
+    } else if schema != nil { throw WalletFailure.core("unsupported_read_scope") }
+
     guard scope == "devgraph.work.read", !operations.isEmpty,
       Set(operations).isSubset(of: version.operations), Set(operations).count == operations.count,
       !work_kinds.isEmpty,
@@ -233,7 +241,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     guard access.read_grants.contains(where: { $0.operations.contains("list") && $0.work_kinds.contains(kind) }) else {
       throw WalletFailure.core("unsupported_read_scope")
     }
-    if access.readProtocol == .monitorV3 {
+    if access.readProtocol != .nativeV2 {
       var query = URLComponents()
       query.queryItems = [URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "20")]
       if let after {
@@ -243,7 +251,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
         else { throw WalletFailure.core("invalid_response") }
         query.queryItems! += [URLQueryItem(name: "after", value: after.after), URLQueryItem(name: "revision", value: revision)]
       }
-      let data = try await read(operation: "list", parameters: ["path": "/todos/v2?" + (query.percentEncodedQuery ?? "")], protocol: .monitorV3)
+      let data = try await read(operation: "list", parameters: ["path": "/todos/v2?" + (query.percentEncodedQuery ?? "")], protocol: access.readProtocol)
       return try decodeMonitorPage(data, kind: kind, after: after)
     }
     var parameters: [String: Any] = ["kind": kind, "limit": 20]
@@ -270,7 +278,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     guard validWorkID(id), access.read_grants.contains(where: { $0.operations.contains("get") && $0.work_kinds.contains(kind) }) else {
       throw WalletFailure.core("unsupported_read_scope")
     }
-    let parameters: [String: Any] = access.readProtocol == .monitorV3
+    let parameters: [String: Any] = access.readProtocol != .nativeV2
       ? ["path": "/todos/v2/" + kind + "/" + id] : ["kind": kind, "work_id": id]
     let data = try await read(operation: "get", parameters: parameters, protocol: access.readProtocol)
     let result = try JSONDecoder().decode(WorkRecord.self, from: data)
@@ -279,7 +287,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
   }
   public func related(kind: String, id: String, relationship: String, after: WorkPageCursor? = nil) async throws -> WorkPage {
     let access = try await manifest()
-    guard access.readProtocol == .monitorV3, validWorkID(id),
+    guard access.readProtocol != .nativeV2, validWorkID(id),
       access.read_grants.contains(where: {
         $0.operations.contains("relationships") && $0.work_kinds.contains(kind) && $0.relationship_types.contains(relationship)
       }) else { throw WalletFailure.core("unsupported_read_scope") }
@@ -293,7 +301,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
       query.queryItems!.append(URLQueryItem(name: "after_resource", value: after.after))
     }
     let path = "/work/" + kind + "/" + id + "/relationships/" + relationship + "?" + (query.percentEncodedQuery ?? "")
-    let data = try await read(operation: "relationships", parameters: ["path": path], protocol: .monitorV3)
+    let data = try await read(operation: "relationships", parameters: ["path": path], protocol: access.readProtocol)
     struct Page: Decodable { let items: [WorkRecord] }
     let page = try JSONDecoder().decode(Page.self, from: data)
     let keys = page.items.map(\.rowID)
@@ -342,11 +350,16 @@ private func parseGrants(_ value: Any?, protocol version: WorkReadProtocol) thro
       "scope", "operations", "relationship_types", "work_kinds", "include_archived",
     ]
     guard base.isSubset(of: Set(value.keys)),
-      Set(value.keys).isSubset(of: base.union(["work_ids", "arena_ids"]))
+      Set(value.keys).isSubset(of: base.union(["work_ids", "arena_ids"]).union(version == .pathV4 ? ["schema","resource_paths"] : []))
     else { throw WalletFailure.core("invalid_response") }
   }
   let grants = try JSONDecoder().decode(
     [WorkReadGrant].self, from: JSONSerialization.data(withJSONObject: values))
+  for raw in values {
+    if let paths = raw["resource_paths"] as? [[String:Any]] {
+      guard paths.allSatisfy({ Set($0.keys) == ["schema","path"] }) else { throw WalletFailure.core("unsupported_read_scope") }
+    } else if raw["resource_paths"] != nil { throw WalletFailure.core("unsupported_read_scope") }
+  }
   for grant in grants { try grant.validate(protocol: version) }
   return grants
 }

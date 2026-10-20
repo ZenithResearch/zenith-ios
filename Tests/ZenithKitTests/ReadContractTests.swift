@@ -61,6 +61,7 @@ private final class ReadBackend {
   var accessActions: [String] = []
   var submitCount = 0
   var failSubmittedResponse = false
+  var rejectAccessPreparation = false
   var accessRequestID: String?
   var wrongResultVersion = false
   var statusCode = 200
@@ -92,6 +93,7 @@ private final class ReadBackend {
     switch request.url!.path {
     case "/devgraph/access-requests/v2/challenges":
       statusCode=200
+      if rejectAccessPreparation { statusCode=400;return try json(["error":"invalid_access_request"]) }
       let action=try XCTUnwrap(input["request"] as? [String:Any])
       accessActions.append(try XCTUnwrap(action["action"] as? String))
       let now=UInt64(Date().timeIntervalSince1970)
@@ -187,6 +189,10 @@ private final class ReadBackend {
     if version == .nativeV2 {
       grant["operations"] = ["list", "get"]
       grant["work_kinds"] = ["Task"]
+    }
+    if version == .pathV4 {
+      grant["schema"] = "devgraph.path-read-grant.v1"
+      grant["resource_paths"] = [["schema":"devgraph.resource-path.v1","path":["Arena/research","Project/test"]]]
     }
     let operations = grant["operations"] as! [String]
     let permissions = operations.map {
@@ -294,7 +300,7 @@ final class ReadContractTests: XCTestCase {
     }
   }
   func testModernAndLegacyEnrollmentPersistenceAndSignedReadsThroughNativeCore() async throws {
-    for version in [WorkReadProtocol.nativeV2, .monitorV3] {
+    for version in [WorkReadProtocol.nativeV2, .monitorV3, .pathV4] {
       let backend = try ReadBackend(version)
       ReadProtocolStub.use(backend)
       defer { ReadProtocolStub.use(nil) }
@@ -309,7 +315,7 @@ final class ReadContractTests: XCTestCase {
         transport: PrivateTransport(configuration: session))
       let proposal = try await client.prepare()
       XCTAssertEqual(proposal.readProtocol, version)
-      if version == .monitorV3 {
+      if version != .nativeV2 {
         backend.wrongResultVersion = true
         do {
           try await client.connect(proposal)
@@ -328,10 +334,10 @@ final class ReadContractTests: XCTestCase {
       _ = try await repository.unlock(password: "disposable read password")
       let saved = try await client.manifest()
       XCTAssertEqual(saved.readProtocol, version)
-      let kind = version == .monitorV3 ? "Todo" : "Task"
+      let kind = version != .nativeV2 ? "Todo" : "Task"
       let page = try await client.page(kind: kind)
       XCTAssertEqual(page.items.count, 1)
-      if version == .monitorV3 {
+      if version != .nativeV2 {
         let second = try await client.page(kind: kind, after: XCTUnwrap(page.next))
         XCTAssertEqual(second.items.first?.id, "second")
         XCTAssertNil(second.next)
@@ -346,7 +352,7 @@ final class ReadContractTests: XCTestCase {
       }
       let detail = try await client.get(kind: kind, id: XCTUnwrap(page.items.first?.id))
       XCTAssertFalse(detail.description.isEmpty)
-      if version == .monitorV3 {
+      if version != .nativeV2 {
         backend.statusCode = 409
         do {
           _ = try await client.page(kind: kind, after: page.next)
@@ -397,12 +403,23 @@ final class ReadContractTests: XCTestCase {
     let session=URLSessionConfiguration.ephemeral; session.protocolClasses=[ReadProtocolStub.self]
     let client=try DevgraphReadClient(repository:repository,configuration:backend.config,transport:PrivateTransport(configuration:session))
     let store=try WorkAccessRequestStore(directory:directory.appendingPathComponent("requests"))
-    let first=try await client.prepareAccessRequest(store:store)
+    let catalog = try WorkAccessCatalog.decode(Data(contentsOf:XCTUnwrap(Bundle.module.url(forResource:"devgraph-access-catalog",withExtension:"json"))),receiver:"https://example.test",issuer:"fixture")
+    let preference = try WorkAccessPreference(catalog:catalog,presetID:"contributor",paths:[XCTUnwrap(catalog.scopes.last).resource_path])
+    backend.rejectAccessPreparation=true
+    do { _ = try await client.prepareAccessRequest(store:store,preference:preference);XCTFail("Rejected preparation") } catch { }
+    let stranded = try await client.hasAccessRequest(store:store)
+    XCTAssertFalse(stranded)
+    backend.rejectAccessPreparation=false
+    let first=try await client.prepareAccessRequest(store:store,preference:preference)
+    XCTAssertEqual(first.preference,preference)
+    let details = try XCTUnwrap(backend.challenge["details"] as? [String:Any])
+    XCTAssertEqual(details["schema"] as? String,"devgraph.access-request-action.v2")
     XCTAssertFalse(first.checkingStatus)
     backend.failSubmittedResponse=true
     do { _ = try await client.submitAccessRequest(first); XCTFail("Lost response") } catch { }
     let recovered=try await client.prepareAccessRequest(store:WorkAccessRequestStore(directory:directory.appendingPathComponent("requests")))
     XCTAssertTrue(recovered.checkingStatus)
+    XCTAssertEqual(recovered.preference,preference)
     XCTAssertEqual(recovered.requestID,first.requestID)
     let result=try await client.submitAccessRequest(recovered)
     XCTAssertEqual(result.status,"pending")
