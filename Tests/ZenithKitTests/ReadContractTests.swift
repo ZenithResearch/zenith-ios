@@ -299,6 +299,31 @@ final class ReadContractTests: XCTestCase {
           json(corrupt), identity: json(identity), configuration: backend.config, now: now))
     }
   }
+  func testNativeV2GraphAccessWithoutCommunityMembership() async throws {
+    let backend = try ReadBackend(.pathV4)
+    ReadProtocolStub.use(backend); defer { ReadProtocolStub.use(nil) }
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = try WalletRepository(directory: directory)
+    _ = try await repository.create(password: "disposable graph access password")
+    let backup = try await repository.exportRecovery(password: "disposable recovery password")
+    let state = try await repository.verifyBackup(file: backup, password: "disposable recovery password")
+    XCTAssertEqual(state.graphAccessProtocol, "castalia.graph-access.v2")
+    XCTAssertTrue(state.canRequestWorkAccess)
+    XCTAssertFalse(state.membershipActive)
+    let identity = try object(await repository.graphAccessIdentityV2())
+    XCTAssertEqual(Set(identity.keys), ["subject_public_key","installation_id"])
+    let session = URLSessionConfiguration.ephemeral; session.protocolClasses = [ReadProtocolStub.self]
+    let client = try DevgraphReadClient(repository: repository,configuration: backend.config,transport: PrivateTransport(configuration: session))
+    let proposal = try await client.prepare()
+    try await client.connect(proposal)
+    let page = try await client.page(kind: "Todo")
+    XCTAssertEqual(page.items.count,1)
+    await repository.lock()
+    _ = try await repository.unlock(password: "disposable graph access password")
+    let restored = try await client.manifest()
+    XCTAssertEqual(restored.subject_public_key,identity["subject_public_key"] as? String)
+  }
   func testModernAndLegacyEnrollmentPersistenceAndSignedReadsThroughNativeCore() async throws {
     for version in [WorkReadProtocol.nativeV2, .monitorV3, .pathV4] {
       let backend = try ReadBackend(version)

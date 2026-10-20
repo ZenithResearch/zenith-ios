@@ -190,7 +190,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     return request
   }
   public func prepare() async throws -> ReadAccessProposal {
-    let identity = try await repository.readAccessIdentity()
+    let identity = try await repository.graphAccessIdentityV2()
     let response = try await response(
       request(path: "/devgraph/native-read/v2/challenges", body: identity), maximum: 16_384)
     return try decodeReadProposal(response, identity: identity, configuration: configuration, now: now)
@@ -200,7 +200,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
       now < proposal.challengeExpiry
     else { throw WalletFailure.core("access_expired") }
     let ticket = repository.lifecycleTicket()
-    let approved = try await repository.approveReadCredential(
+    let approved = try await repository.approveGraphReadCredentialV2(
       proposal.challenge, pin: configuration.authority, now: now)
     try repository.checkLifecycle(ticket)
     let response = try await response(
@@ -216,7 +216,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
       credential: JSONSerialization.data(withJSONObject: credential), now: now, ticket: ticket)
   }
   public func manifest() async throws -> NativeReadManifest {
-    let access = try object(await repository.readCredential(receiver: configuration.origin, now: now))
+    let access = try object(await repository.graphReadCredentialV2(receiver: configuration.origin, now: now))
     guard let credential = access["credential"] as? [String: Any],
       let claims = credential["claims"] as? [String: Any],
       let permissions = claims["permissions"] as? [[String: Any]]
@@ -315,7 +315,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     let ticket = repository.lifecycleTicket()
     let call: [String: Any] = ["operation": "devgraph.work." + operation,
       "resource": "https://work.zenith-research.ca/devgraph", "parameters": parameters]
-    let proof = try await repository.signReadCall(receiver: configuration.origin,
+    let proof = try await repository.signGraphReadCallV2(receiver: configuration.origin,
       call: JSONSerialization.data(withJSONObject: call), now: now)
     try repository.checkLifecycle(ticket)
     let data = try await response(request(path: version.requestPath, body: proof), readView: true)

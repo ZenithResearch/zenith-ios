@@ -8,8 +8,15 @@ public struct WalletState: Decodable, Sendable {
   public let publicKey: String?
   public let backupVerified: Bool
   public let membershipActive: Bool
+  public let backupEligible: Bool?
+  public let graphAccessProtocol: String?
+  public var canRequestWorkAccess: Bool {
+    unlocked && (backupEligible ?? backupVerified) && graphAccessProtocol == "castalia.graph-access.v2"
+  }
   enum CodingKeys: String, CodingKey {
     case membershipActive = "membership_active"
+    case backupEligible = "backup_eligible"
+    case graphAccessProtocol = "graph_access_protocol"
     case configured, unlocked, revision
     case publicKey = "public_key"
     case backupVerified = "backup_verified"
@@ -329,6 +336,48 @@ public actor WalletRepository {
   }
   public func signReadCall(receiver: String, call: Data, now: UInt64) throws -> Data {
     try core.invoke(["operation":"sign_read_call", "receiver":receiver,
+      "call":JSONSerialization.jsonObject(with: call), "now":now])
+  }
+
+  // Explicit opt-in graph protocol v2. Do not silently fall back to legacy APIs.
+  public func graphAccessIdentityV2() throws -> Data {
+    let value = try core.invoke(["operation": "graph_access_identity_v2"])
+    guard let identity = try JSONSerialization.jsonObject(with: value) as? [String: String],
+      identity["protocol"] == "castalia.graph-access.v2",
+      let owner = identity["subject_public_key"], let installation = identity["installation_id"]
+    else { throw WalletFailure.core("wallet_update_required") }
+    // The native API marker is local capability metadata, not a server field.
+    return try JSONSerialization.data(withJSONObject: ["subject_public_key":owner,"installation_id":installation])
+  }
+  public func prepareGraphAccessRequestV2(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> NativeAccessRequestPreview {
+    try Task.checkCancellation()
+    let ticket = lifecycle.ticket()
+    guard let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.invalidFile }
+    let result = try core.decode(["operation":"prepare_graph_access_request_v2","challenge":text,
+      "pin":JSONSerialization.jsonObject(with:JSONEncoder().encode(pin)),"now":now], as:NativeAccessRequestPreview.self)
+    try checkLifecycle(ticket)
+    return result
+  }
+  public func approveGraphAccessRequestV2(_ preview: NativeAccessRequestPreview, now: UInt64, ticket: UInt64) throws -> Data {
+    try Task.checkCancellation()
+    try checkLifecycle(ticket)
+    let result = try core.invoke(["operation":"approve_graph_access_request_v2","token":preview.token,"now":now])
+    try checkLifecycle(ticket)
+    return result
+  }
+  public func approveGraphReadCredentialV2(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> Data {
+    let ticket = lifecycle.ticket()
+    guard let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.invalidFile }
+    let result = try core.invoke(["operation":"approve_graph_read_credential_v2", "challenge":text,
+      "pin":JSONSerialization.jsonObject(with: JSONEncoder().encode(pin)), "now":now])
+    try checkLifecycle(ticket)
+    return result
+  }
+  public func graphReadCredentialV2(receiver: String, now: UInt64) throws -> Data {
+    try core.invoke(["operation":"graph_read_credential_v2", "receiver":receiver, "now":now])
+  }
+  public func signGraphReadCallV2(receiver: String, call: Data, now: UInt64) throws -> Data {
+    try core.invoke(["operation":"sign_graph_read_call_v2", "receiver":receiver,
       "call":JSONSerialization.jsonObject(with: call), "now":now])
   }
   public func readAccess(receiver: String, now: UInt64) throws -> Data {

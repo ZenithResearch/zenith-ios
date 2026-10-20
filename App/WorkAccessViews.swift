@@ -30,7 +30,8 @@ struct WorkAccessView: View {
               LabeledContent("Provider", value: proposal.issuer)
               Text(proposal.receiver).foregroundStyle(.secondary)
               Text("Read permitted work. This cannot create, change or delete anything.")
-              LabeledContent("Expires", value: proposal.expires.formatted())
+              LabeledContent("Read credential expires", value: proposal.expires.formatted())
+              Text("You can obtain a new read credential while your operator-approved grant remains active. No new operator decision is needed.").font(.footnote)
               ForEach(Array(proposal.grants.enumerated()), id: \.offset) { _, grant in
                 Text(grant.work_kinds.joined(separator: ", "))
                 Text("Actions: " + grant.operations.joined(separator: ", "))
@@ -76,7 +77,7 @@ struct WorkAccessView: View {
               LabeledContent("Access", value: "Read only")
               Text(current.receiver)
               LabeledContent(
-                "Expires",
+                "Read credential expires",
                 value: Date(timeIntervalSince1970: Double(current.expires_at)).formatted())
             }
             Section {
@@ -91,12 +92,10 @@ struct WorkAccessView: View {
               Text(
                 "The server can also revoke access. Recovery files do not contain this connection.")
             }
-          } else if model.state?.membershipActive != true {
+          } else if model.state?.canRequestWorkAccess != true {
             Section {
-              Text("Join Zenith to continue").font(.headline)
-              Text("Your server is saved. Join Zenith here, then continue with your request for work access. Membership does not grant access to this server.")
-              Button("Open Membership") { membershipSetup = true }
-                .accessibilityIdentifier("work.membership.open")
+              Text("Prepare your Wallet").font(.headline)
+              Text("Unlock your Wallet and verify its recovery backup before requesting access. Community membership is separate from access to this graph.")
             }
           } else {
             if let store = model.accessRequestStore { WorkAccessRequestSection(client:client,store:store) }
@@ -111,6 +110,8 @@ struct WorkAccessView: View {
             }
           }
           Section {
+            Button("Membership (optional)") { membershipSetup = true }
+              .accessibilityIdentifier("work.membership.open")
             Button("Change connection") { changingServer = true }.disabled(model.busy)
             Button("Remove server", role: .destructive) {
               client.cancel()
@@ -160,8 +161,8 @@ struct WorkAccessView: View {
       current = manifest
       if continueSetup {
         continueSetup = false
-        if manifest == nil, model.state?.membershipActive == true, let client {
-          model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+        if manifest == nil {
+          model.notice = "Server saved. Request access, or check your existing grant, to continue."
         }
       }
     }

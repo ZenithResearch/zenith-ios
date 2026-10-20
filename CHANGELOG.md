@@ -4,6 +4,24 @@
 
 ### Added
 
+- Add the explicit dated/until-revoked grant validity reader and common rejection/attenuation vectors — mobile clients need the same lifetime semantics as the server while old connections remain unchanged.
+
+### Added
+- Native server preset and Arena/Initiative/Project request picker with exact path disclosure and scoped-read compatibility — members can request reusable access without pasted credentials, while rejected preparations and lost responses preserve safe recovery. Build 22 updates the existing app without changing Wallet custody.
+
+
+### Fixed
+
+- Open Membership in a dedicated sheet with a return to the saved Work server and consume setup continuation once — avoid navigation cancellation interfering with joining and premature read attempts before operator access is assigned. Development build 21.
+
+### Added
+
+- Replace the placeholder Z with the existing ZenithOS brand artwork and retain its source provenance — use the real Zenith identity on the Home Screen and welcome screen. Development build 20.
+- Add a mint Zenith app icon and matching welcome mark — make the installed app recognizable on the Home Screen. Development build 19.
+- Add public HTTPS server discovery and native request/status consent with durable request IDs — remote members can request access and recover uncertain responses without pasted credentials or duplicate requests.
+
+### Added
+
 - Prepare on-device speech to text in the Chat composer with explicit microphone permission, editable transcripts, bounded recording and cleanup on interruption/locking. Sending remains manual. Development build 17.
 
 ### Added

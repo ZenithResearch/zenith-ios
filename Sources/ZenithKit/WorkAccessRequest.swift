@@ -107,19 +107,19 @@ public struct WorkAccessRequestResult: Decodable, Sendable {
 
 public extension DevgraphReadClient {
   func hasAccessRequest(store: WorkAccessRequestStore) async throws -> Bool {
-    let identity = try JSONSerialization.jsonObject(with: await repository.readAccessIdentity()) as? [String:String]
+    let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String]
     guard let owner=identity?["subject_public_key"],let device=identity?["installation_id"] else { throw WalletFailure.core("invalid_response") }
     return try store.existing(receiver:configuration.origin,subject:owner,installation:device) != nil
   }
   func startNewAccessRequest(store: WorkAccessRequestStore, after result: WorkAccessRequestResult) async throws {
-    let identity = try JSONSerialization.jsonObject(with: await repository.readAccessIdentity()) as? [String:String]
+    let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String]
     guard let owner=identity?["subject_public_key"],let device=identity?["installation_id"] else { throw WalletFailure.core("invalid_response") }
     try store.startNew(receiver:configuration.origin,subject:owner,installation:device,after:result)
   }
 
   func prepareAccessRequest(store: WorkAccessRequestStore, resubmitOriginal: Bool = false, preference: WorkAccessPreference? = nil) async throws -> WorkAccessRequestConsent {
     let ticket = repository.lifecycleTicket()
-    let identity = try JSONSerialization.jsonObject(with: await repository.readAccessIdentity()) as? [String:String]
+    let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String]
     guard let owner = identity?["subject_public_key"], let device = identity?["installation_id"] else { throw WalletFailure.core("invalid_response") }
     let old = try store.existing(receiver:configuration.origin,subject:owner,installation:device)
     let record = old ?? WorkAccessRequestRecord(receiver:configuration.origin,subject:owner,installation:device,requestID:UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),preference:preference)
@@ -135,7 +135,7 @@ public extension DevgraphReadClient {
     guard let value = try JSONSerialization.jsonObject(with:challenge) as? [String:Any],
       let details = value["details"] as? [String:Any], NSDictionary(dictionary:details).isEqual(to:action) else { throw WalletFailure.core("invalid_response") }
     try repository.checkLifecycle(ticket)
-    let prepared = try await repository.prepareAccessRequest(challenge,pin:configuration.authority,now:UInt64(Date().timeIntervalSince1970))
+    let prepared = try await repository.prepareGraphAccessRequestV2(challenge,pin:configuration.authority,now:UInt64(Date().timeIntervalSince1970))
     try repository.checkLifecycle(ticket)
     // Persist before presenting consent. A server-rejected unsigned preparation
     // must not strand the member with a stale, unsubmitted catalog preference.
@@ -146,7 +146,7 @@ public extension DevgraphReadClient {
   func submitAccessRequest(_ consent: WorkAccessRequestConsent) async throws -> WorkAccessRequestResult {
     try repository.checkLifecycle(consent.lifecycle)
     guard consent.receiver == configuration.origin, consent.issuer == configuration.issuer else { throw WalletFailure.core("invalid_response") }
-    let approved = try await repository.approveAccessRequest(consent.native, now:UInt64(Date().timeIntervalSince1970),ticket:consent.lifecycle)
+    let approved = try await repository.approveGraphAccessRequestV2(consent.native, now:UInt64(Date().timeIntervalSince1970),ticket:consent.lifecycle)
     var request=URLRequest(url:URL(string:configuration.origin + "/devgraph/access-requests/v2/actions")!)
     request.httpMethod="POST";request.httpBody=approved;request.setValue("application/json",forHTTPHeaderField:"Content-Type")
     // Never automatically repeat a submit after an uncertain response. The
