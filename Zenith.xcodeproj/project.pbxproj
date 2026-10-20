@@ -34,6 +34,7 @@
 		9F860EF22BD635C6F5FBD94D /* MembershipView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */; };
 		A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */; };
 		B9A5B0883AC8F1DA3EEE6A41 /* AppleDictationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */; };
+		C5A6A07B58B5CC71F0BBF6B8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E4F2583AAB21F839A0C34920 /* Assets.xcassets */; };
 		CFE6B3065996B139A3F88E2F /* RecoveryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */; };
 		DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */; };
 		EA036C48C0EDB9C6D1FD4D3D /* HermesChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845B9719E8A4CB3429589DF2 /* HermesChatView.swift */; };
@@ -87,6 +88,7 @@
 		C76C2B4569D4805FDA76BBCD /* HermesChatModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesChatModel.swift; sourceTree = "<group>"; };
 		C954996205ACC40099CF7808 /* Tailscale-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Tailscale-LICENSE.txt"; sourceTree = "<group>"; };
 		E4D471A1EAA463D3861BCF7F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		E4F2583AAB21F839A0C34920 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupWalletFlow.swift; sourceTree = "<group>"; };
 		E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkAccessViews.swift; sourceTree = "<group>"; };
 		E6248D401A43A1978C64A543 /* TransferViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferViews.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 		F5F56BAF4CAF4DEFA278E552 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				E4F2583AAB21F839A0C34920 /* Assets.xcassets */,
 				E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */,
 				58F28FE66495D39285938EBB /* CreateWalletFlow.swift */,
 				996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */,
@@ -280,6 +283,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C5A6A07B58B5CC71F0BBF6B8 /* Assets.xcassets in Resources */,
 				9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */,
 				DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */,
 				544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */,
@@ -390,7 +394,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",
@@ -417,7 +421,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",

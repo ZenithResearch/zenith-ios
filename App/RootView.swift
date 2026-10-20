@@ -61,6 +61,10 @@ struct WelcomeView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 24) {
             Spacer()
+            Image("ZenithMark")
+              .resizable().scaledToFit().frame(width: 80, height: 80)
+              .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+              .accessibilityHidden(true)
             Text("Welcome to Zenith").font(.largeTitle).bold()
             Text("Start fresh or bring your wallet to this phone.").foregroundStyle(
               .secondary)
