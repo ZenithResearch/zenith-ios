@@ -24,6 +24,7 @@
 		5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */; };
 		65F141F12BB59F36E3A08E8B /* BiometricKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11DA38A09370928D5BB5759 /* BiometricKeychain.swift */; };
 		66C54D034B9239C28919B21D /* ImportWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */; };
+		75CECC4EE61881B98D3CD447 /* WorkAccessRequestSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */; };
 		77426BE1161C6AD8936723D2 /* WorkServerSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */; };
 		8A1908EF78DC15C31EB50783 /* CreateWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F28FE66495D39285938EBB /* CreateWalletFlow.swift */; };
 		8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6248D401A43A1978C64A543 /* TransferViews.swift */; };
@@ -66,6 +67,7 @@
 		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationDriver.swift; sourceTree = "<group>"; };
 		4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateNetworkView.swift; sourceTree = "<group>"; };
+		4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkAccessRequestSection.swift; sourceTree = "<group>"; };
 		58F28FE66495D39285938EBB /* CreateWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateWalletFlow.swift; sourceTree = "<group>"; };
 		5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleDriver.swift; sourceTree = "<group>"; };
 		79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkServerDraft.swift; sourceTree = "<group>"; };
@@ -201,6 +203,7 @@
 				816148DAF0ACAFA83EE9439E /* RootView.swift */,
 				E6248D401A43A1978C64A543 /* TransferViews.swift */,
 				1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */,
+				4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */,
 				E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */,
 				A991E568D963A960C0F62136 /* WorkConnectionSection.swift */,
 				79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */,
@@ -311,6 +314,7 @@
 				8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */,
 				8DDE8D079C945A00DF552A24 /* UnlockView.swift in Sources */,
 				8CCB3A40301BE61DB5E12030 /* WalletFlowComponents.swift in Sources */,
+				75CECC4EE61881B98D3CD447 /* WorkAccessRequestSection.swift in Sources */,
 				A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */,
 				45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */,
 				2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */,
@@ -386,7 +390,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",
@@ -413,7 +417,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",

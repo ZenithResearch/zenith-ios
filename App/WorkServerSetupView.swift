@@ -14,6 +14,8 @@ struct WorkServerSetupView: View {
   @State private var importing = false
   @State private var manual = false
   @State private var error: String?
+  @State private var discovering = false
+  @State private var discoveryTask: Task<Void,Never>?
   @State private var nearby: [WorkServerInboxEntry] = []
 
   var body: some View {
@@ -27,7 +29,7 @@ struct WorkServerSetupView: View {
     .navigationTitle("Connect to work")
     .navigationBarTitleDisplayMode(.inline)
     .onAppear { draft.active = true }
-    .onDisappear { if scene == .active { draft.active = false } }
+    .onDisappear { discoveryTask?.cancel(); if scene == .active { draft.active = false } }
     .task { refreshFiles() }
     .onChange(of: scene) { _, phase in if phase == .active { refreshFiles() } }
     .sheet(isPresented: $manual) {
@@ -56,6 +58,13 @@ struct WorkServerSetupView: View {
             .foregroundStyle(.secondary)
         }.padding(.vertical, 8)
       }
+      Section {
+        TextField("https://your-work-server", text:$draft.address)
+          .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+          .disabled(discovering || busy)
+        Button("Find server") { discover() }.disabled(discovering || busy || draft.address.isEmpty)
+        if discovering { ProgressView("Finding server…") }
+      } header: { Text("Server address") } footer: { Text("Enter the HTTPS address supplied by your administrator. You’ll review its verification details before saving or sharing your Wallet identity.") }
       if !nearby.isEmpty {
         Section {
           ForEach(nearby) { item in
@@ -154,13 +163,29 @@ struct WorkServerSetupView: View {
     if let message = error ?? saveError { Section { Text(message).foregroundStyle(.red) } }
     if busy { Section { ProgressView("Connecting…") } }
   }
+  private func discover() {
+    discoveryTask?.cancel(); discovering = true; error = nil
+    let address = draft.address
+    discoveryTask = Task { @MainActor in
+      defer { discovering = false }
+      do {
+        let server = try await WorkServerDiscovery.discover(address)
+        guard !Task.isCancelled, draft.address == address, scene == .active else { return }
+        select(server)
+      } catch {
+        guard !Task.isCancelled else { return }
+        self.error = "Could not discover this server. Check its HTTPS address, or import a connection file from your administrator."
+      }
+    }
+  }
   private func refreshFiles() {
     guard let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
     do { nearby = try WorkServerInbox.profiles(in: directory) }
     catch { nearby = []; self.error = "Could not check Zenith’s folder. You can still choose a connection file." }
   }
   private func select(_ server: WorkAccessConfiguration, connect: Bool = false) {
-    if server.network != .tailscale { privateNetwork.disconnect() }
+    // Preparing a public/LAN draft must not stop the shared private session,
+    // including Chat, or disrupt the saved connection when setup is cancelled.
     draft.network = server.network
     draft.preview = server
     error = nil

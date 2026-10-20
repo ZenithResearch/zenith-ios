@@ -294,6 +294,22 @@ public actor WalletRepository {
       ], as: RestorePreview.self)
     _ = try commit(preview, ticket: ticket)
   }
+  public func prepareAccessRequest(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> NativeAccessRequestPreview {
+    try Task.checkCancellation()
+    let ticket = lifecycle.ticket()
+    guard let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.invalidFile }
+    let result = try core.decode(["operation":"prepare_access_request","challenge":text,
+      "pin":JSONSerialization.jsonObject(with:JSONEncoder().encode(pin)),"now":now], as:NativeAccessRequestPreview.self)
+    try checkLifecycle(ticket)
+    return result
+  }
+  public func approveAccessRequest(_ preview: NativeAccessRequestPreview, now: UInt64, ticket: UInt64) throws -> Data {
+    try Task.checkCancellation()
+    try checkLifecycle(ticket)
+    let result = try core.invoke(["operation":"approve_access_request","token":preview.token,"now":now])
+    try checkLifecycle(ticket)
+    return result
+  }
   public func approveReadCredential(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> Data {
     let ticket = lifecycle.ticket()
     guard let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.invalidFile }

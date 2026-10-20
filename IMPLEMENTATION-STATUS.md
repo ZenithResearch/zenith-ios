@@ -64,3 +64,13 @@ The shared private connection setup supports explicit auth-key entry and bounded
 ## Chat dictation — build 17, October 17, 2026
 
 Prepared a microphone composer action using Apple Speech/AVAudioEngine with required on-device recognition and explicit permission prompts. The transcript joins the current draft, stays editable after Stop, and is sent only through the existing explicit Send action. Capture is bounded to 55 seconds, finalization to three seconds, and stale callbacks are rejected after stopping/cancelling/clearing. No audio uploads, audio files or background recording are introduced. The iOS 18.1 deployment minimum and text-only gateway protocol remain compatible. Physical-device dictation, denial, audio interruptions, locales and accessibility remain acceptance checks.
+
+## Remote Work access — build 18, October 19, 2026
+
+Adds public HTTPS server discovery with explicit verification review, native
+access-request/status consent and durable public request IDs for unknown-outcome
+recovery. Existing LAN/Tailscale and native-v2/monitor-v3 readers remain supported.
+The shared native core is pinned to d89580e; this adds neither arbitrary signing
+nor native Work mutations. The 71-test native suite passed with 2 optional skips,
+and full Simulator/signed-device builds passed. Remote phone acceptance remains
+separate. See REMOTE-ACCESS.md for the exact boundary and pending device checks.

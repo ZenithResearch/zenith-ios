@@ -25,6 +25,33 @@ private final class ResponseProtocol: URLProtocol {
   override func stopLoading() {}
 }
 final class TransportTests: XCTestCase {
+  func testDiscoveryIsPublicBoundedAndCannotMoveTheReceiver() async throws {
+    let config = try WorkAccessConfiguration(name:"Remote test",receiver:URL(string:"https://example.test")!,issuer:"test",keyID:"key",publicKey:String(repeating:"12",count:32))
+    let encoded = try JSONEncoder().encode(config)
+    let discovered = try await WorkServerDiscovery.discover("https://example.test",transport:transport(status:200,data:encoded))
+    XCTAssertEqual(discovered,config)
+    do {
+      _ = try await WorkServerDiscovery.discover("https://different.test",transport:transport(status:200,data:encoded))
+      XCTFail("Discovery cannot select a different receiver")
+    } catch { }
+    do {
+      _ = try await WorkServerDiscovery.discover("https://example.test",transport:transport(status:302,data:encoded))
+      XCTFail("No redirect")
+    } catch { }
+  }
+  func testRequestRecordSurvivesRelaunchWithoutCreatingAnotherID() throws {
+    let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at:directory) }
+    let store=try WorkAccessRequestStore(directory:directory)
+    let first=try store.begin(receiver:"https://example.test",subject:String(repeating:"11",count:32),installation:String(repeating:"22",count:16))
+    let reloaded=try WorkAccessRequestStore(directory:directory).begin(receiver:first.receiver,subject:first.subject,installation:first.installation)
+    XCTAssertEqual(first,reloaded)
+    XCTAssertNil(try store.existing(receiver:"https://other.test",subject:first.subject,installation:first.installation))
+    let files=try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:nil)
+    XCTAssertEqual(files.count,1)
+    let fields=try JSONSerialization.jsonObject(with:Data(contentsOf:files[0])) as! [String:Any]
+    XCTAssertEqual(Set(fields.keys),["receiver","subject","installation","requestID"])
+  }
   func testReadConnectionRequiresSeparateIssuerPin() throws {
     let old = Data(#"{"name":"Work","issuer":"example","receiver":"https://example.test"}"#.utf8)
     XCTAssertThrowsError(try JSONDecoder().decode(WorkAccessConfiguration.self, from: old))

@@ -48,6 +48,7 @@ final class WalletModel: ObservableObject {
   @Published var generation = 0
   @Published private(set) var workServer: WorkAccessConfiguration?
   private var workServerStore: WorkServerStore?
+  private(set) var accessRequestStore: WorkAccessRequestStore?
   private(set) var repository: WalletRepository?
   private var operation: Task<Void, Never>?
   init() {
@@ -59,6 +60,7 @@ final class WalletModel: ObservableObject {
       workServerStore = try WorkServerStore(
         directory: base.appendingPathComponent("WorkConnection", isDirectory: true))
       workServer = try workServerStore?.load()
+      accessRequestStore = try WorkAccessRequestStore(directory:base.appendingPathComponent("WorkRequests",isDirectory:true))
     } catch { self.error = "Wallet storage is unavailable. Reopen Zenith to try again." }
   }
   func load() async {

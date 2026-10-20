@@ -58,6 +58,10 @@ private final class ReadBackend {
   var policy: [String: Any] = [:]
   var credential: [String: Any] = [:]
   var calls: [[String: Any]] = []
+  var accessActions: [String] = []
+  var submitCount = 0
+  var failSubmittedResponse = false
+  var accessRequestID: String?
   var wrongResultVersion = false
   var statusCode = 200
   init(_ version: WorkReadProtocol) throws {
@@ -86,6 +90,30 @@ private final class ReadBackend {
     }
     let input = try object(body)
     switch request.url!.path {
+    case "/devgraph/access-requests/v2/challenges":
+      statusCode=200
+      let action=try XCTUnwrap(input["request"] as? [String:Any])
+      accessActions.append(try XCTUnwrap(action["action"] as? String))
+      let now=UInt64(Date().timeIntervalSince1970)
+      challenge=["schema":"castalia.access-request-challenge.v1","challenge_id":String(repeating:"aa",count:16),
+        "nonce":String(repeating:"A",count:43),"issuer":"fixture","receiver":"https://example.test",
+        "subject_public_key":action["subject_public_key"]!,"installation_id":action["installation_id"]!,
+        "operation":action["action"] as? String == "submit" ? "access.request":"access.status",
+        "issued_at":now,"expires_at":now+120,"details":action]
+      return try json(challenge)
+    case "/devgraph/access-requests/v2/actions":
+      let approved=try XCTUnwrap(input["challenge"] as? [String:Any])
+      XCTAssertEqual(try json(approved),try json(challenge))
+      XCTAssertNotNil(input["proof"])
+      let publicKey=try Curve25519.Signing.PublicKey(rawRepresentation:data(hex:XCTUnwrap(approved["subject_public_key"] as? String)))
+      let encoded=try XCTUnwrap(input["signature"] as? String)
+      let signature=try XCTUnwrap(Data(base64Encoded:encoded.replacingOccurrences(of:"-",with:"+").replacingOccurrences(of:"_",with:"/")+"=="))
+      XCTAssertTrue(publicKey.isValidSignature(signature,for:Data("castalia/access-request-approval/v1\0".utf8)+(try json(approved))))
+      let action=try XCTUnwrap(approved["details"] as? [String:Any])
+      let identifier=try XCTUnwrap(action["request_id"] as? String)
+      if action["action"] as? String == "submit" { submitCount += 1; accessRequestID=identifier }
+      if failSubmittedResponse { failSubmittedResponse=false; statusCode=503 }
+      return try json(["schema":"devgraph.access-request-result.v1","request_id":identifier,"status":accessRequestID == identifier ? "pending":"unknown","authority_issued":false])
     case "/devgraph/native-read/v2/challenges":
       challenge = try makeChallenge(identity: input)
       return try json(challenge)
@@ -331,6 +359,57 @@ final class ReadContractTests: XCTestCase {
         })
     }
   }
+  func testNativeAccessRequestPreparationConsentSignatureAndLockInvalidation() async throws {
+    let issuer = Curve25519.Signing.PrivateKey()
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = try await makeMember(directory: directory, issuer: issuer)
+    let identity = try object(await repository.readAccessIdentity())
+    let pin = try ReadBackend(.monitorV3).config.authority
+    let now = UInt64(Date().timeIntervalSince1970)
+    let challenge: [String:Any] = ["schema":"castalia.access-request-challenge.v1",
+      "challenge_id":String(repeating:"aa",count:16),"nonce":String(repeating:"A",count:43),
+      "issuer":pin.issuer,"receiver":pin.receiver,"subject_public_key":identity["subject_public_key"]!,
+      "installation_id":identity["installation_id"]!,"operation":"access.request","issued_at":now,"expires_at":now+120,
+      "details":["request_id":String(repeating:"bb",count:16),"intent":NSNull()]]
+    let preview = try await repository.prepareAccessRequest(json(challenge),pin:pin,now:now)
+    let ticket = repository.lifecycleTicket()
+    let approved = try object(await repository.approveAccessRequest(preview,now:now,ticket:ticket))
+    XCTAssertNotNil(approved["proof"])
+    XCTAssertEqual(try json(approved["challenge"]!),try json(challenge))
+    let signature = try XCTUnwrap(approved["signature"] as? String)
+    let bytes = try XCTUnwrap(Data(base64Encoded:signature.replacingOccurrences(of:"-",with:"+").replacingOccurrences(of:"_",with:"/")+"=="))
+    let owner = try Curve25519.Signing.PublicKey(rawRepresentation:data(hex:XCTUnwrap(identity["subject_public_key"] as? String)))
+    XCTAssertTrue(owner.isValidSignature(bytes,for:Data("castalia/access-request-approval/v1\0".utf8)+(try json(challenge))))
+    do { _ = try await repository.approveAccessRequest(preview,now:now,ticket:ticket); XCTFail("one use") } catch { }
+    let pending = try await repository.prepareAccessRequest(json(challenge),pin:pin,now:now)
+    await repository.lock()
+    _ = try await repository.unlock(password:"disposable read password")
+    do { _ = try await repository.approveAccessRequest(pending,now:now,ticket:ticket); XCTFail("lock must invalidate") } catch { }
+  }
+
+  func testLostAccessRequestResponseUsesOriginalIDAndStatusOnly() async throws {
+    let backend=try ReadBackend(.monitorV3)
+    ReadProtocolStub.use(backend); defer { ReadProtocolStub.use(nil) }
+    let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at:directory) }
+    let repository=try await makeMember(directory:directory.appendingPathComponent("wallet"),issuer:backend.issuer)
+    let session=URLSessionConfiguration.ephemeral; session.protocolClasses=[ReadProtocolStub.self]
+    let client=try DevgraphReadClient(repository:repository,configuration:backend.config,transport:PrivateTransport(configuration:session))
+    let store=try WorkAccessRequestStore(directory:directory.appendingPathComponent("requests"))
+    let first=try await client.prepareAccessRequest(store:store)
+    XCTAssertFalse(first.checkingStatus)
+    backend.failSubmittedResponse=true
+    do { _ = try await client.submitAccessRequest(first); XCTFail("Lost response") } catch { }
+    let recovered=try await client.prepareAccessRequest(store:WorkAccessRequestStore(directory:directory.appendingPathComponent("requests")))
+    XCTAssertTrue(recovered.checkingStatus)
+    XCTAssertEqual(recovered.requestID,first.requestID)
+    let result=try await client.submitAccessRequest(recovered)
+    XCTAssertEqual(result.status,"pending")
+    XCTAssertEqual(backend.submitCount,1)
+    XCTAssertEqual(backend.accessActions,["submit","status"])
+  }
+
   private func makeMember(directory: URL, issuer: Curve25519.Signing.PrivateKey) async throws
     -> WalletRepository
   {

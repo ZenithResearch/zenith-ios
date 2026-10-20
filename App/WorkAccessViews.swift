@@ -93,6 +93,7 @@ struct WorkAccessView: View {
               NavigationLink("Open Membership") { MembershipView() }
             }
           } else {
+            if let store = model.accessRequestStore { WorkAccessRequestSection(client:client,store:store) }
             Section {
               Text("Approve what you can read").font(.headline)
               Text("Next, your server shows the work available to you and when access expires.")
