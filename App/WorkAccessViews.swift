@@ -18,6 +18,7 @@ struct WorkAccessView: View {
   @State private var current: NativeReadManifest?
   @State private var continueSetup = false
   @State private var changingServer = false
+  @State private var membershipSetup = false
   @Environment(\.dismiss) private var dismiss
   var body: some View {
     Group {
@@ -89,8 +90,9 @@ struct WorkAccessView: View {
           } else if model.state?.membershipActive != true {
             Section {
               Text("Join Zenith to continue").font(.headline)
-              Text("Your server is saved. Set up Membership, then return here to approve read-only access.")
-              NavigationLink("Open Membership") { MembershipView() }
+              Text("Your server is saved. Join Zenith here, then continue with your request for work access. Membership does not grant access to this server.")
+              Button("Open Membership") { membershipSetup = true }
+                .accessibilityIdentifier("work.membership.open")
             }
           } else {
             if let store = model.accessRequestStore { WorkAccessRequestSection(client:client,store:store) }
@@ -121,6 +123,18 @@ struct WorkAccessView: View {
           model.saveWorkServer(configuration) {}
         }
       }
+    }.sheet(isPresented: $membershipSetup) {
+      NavigationStack {
+        MembershipView {
+          membershipSetup = false
+          model.notice = "Membership active. Request work access from your saved server."
+        }
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Back to Work") { membershipSetup = false }
+          }
+        }
+      }
     }.sheet(isPresented: $changingServer) {
       NavigationStack {
         WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
@@ -140,9 +154,11 @@ struct WorkAccessView: View {
       let manifest = try? await client?.manifest()
       guard !Task.isCancelled, version == model.generation else { return }
       current = manifest
-      if continueSetup, manifest == nil, model.state?.membershipActive == true, let client {
+      if continueSetup {
         continueSetup = false
-        model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+        if manifest == nil, model.state?.membershipActive == true, let client {
+          model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+        }
       }
     }
     .onChange(of: privateNetwork.generation) { _, _ in
@@ -154,7 +170,9 @@ struct WorkAccessView: View {
     }
     .onDisappear {
       client?.cancel()
-      model.cancel()
+      // Opening the membership sheet is part of this saved-server flow. Do not
+      // invalidate its Wallet operations because the presenting view is covered.
+      if !membershipSetup { model.cancel() }
     }
   }
 }
