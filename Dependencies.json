@@ -2,7 +2,7 @@
   "schema": "zenith.ios-dependencies.v1",
   "wallet": {
     "repository": "https://github.com/bananawalnut/castalia-wallet",
-    "revision": "47b56b8a43bda01a59a9bc10d754b53e18e15488",
+    "revision": "11691a0a78823051b7cbe10a99f78b325036f9f2",
     "crates": [
       "castalia-wallet-core",
       "castalia-wallet-native",
@@ -21,7 +21,8 @@
     "monitor_endpoint": "/monitor/wallet-access/v1/requests",
     "access_request": "castalia.access-request-challenge.v1",
     "access_request_endpoint": "/devgraph/access-requests/v2",
-    "native_graph_protocol": "castalia.graph-access.v2"
+    "native_graph_protocol": "castalia.graph-access.v2",
+    "native_operator_protocol": "castalia.operator-access.v1"
   },
   "tailscale": {
     "repository": "https://github.com/tailscale/libtailscale",

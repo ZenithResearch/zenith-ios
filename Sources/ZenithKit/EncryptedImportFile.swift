@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public enum EncryptedImportFile {
   public static let maximumBytes = 1_048_576
@@ -15,15 +16,25 @@ public enum EncryptedImportFile {
     guard url.isFileURL else { throw RecoveryTransferError.invalidFile }
     let scoped = url.startAccessingSecurityScopedResource()
     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+    try requireRegularFile(url)
     var coordinationError: NSError?
     var result: Result<Data, Error> = .failure(RecoveryTransferError.invalidFile)
     NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { file in
       result = Result {
-        let attributes = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-        guard attributes.isRegularFile == true, attributes.isSymbolicLink != true else {
+        // NSURL may cache resource values, and coordination may resolve links.
+        // Inspect the original path again and open the coordinated path without
+        // following a final symlink, then validate the descriptor itself.
+        try requireRegularFile(url)
+        let descriptor = file.withUnsafeFileSystemRepresentation { path in
+          path.map { Darwin.open($0, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) } ?? -1
+        }
+        guard descriptor >= 0 else { throw RecoveryTransferError.invalidFile }
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
+          Darwin.close(descriptor)
           throw RecoveryTransferError.invalidFile
         }
-        let handle = try FileHandle(forReadingFrom: file)
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         defer { try? handle.close() }
         let bytes = try handle.read(upToCount: maximumBytes + 1) ?? Data()
         guard !bytes.isEmpty, bytes.count <= maximumBytes else {
@@ -34,6 +45,14 @@ public enum EncryptedImportFile {
     }
     if coordinationError != nil { throw RecoveryTransferError.invalidFile }
     return try result.get()
+  }
+
+  private static func requireRegularFile(_ url: URL) throws {
+    var info = stat()
+    let code = url.withUnsafeFileSystemRepresentation { path in
+      path.map { lstat($0, &info) } ?? -1
+    }
+    guard code == 0, info.st_mode & S_IFMT == S_IFREG else { throw RecoveryTransferError.invalidFile }
   }
 
   /// A transport admission check, not cryptographic verification. It prevents

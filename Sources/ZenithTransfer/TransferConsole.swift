@@ -8,6 +8,7 @@ import ZenithKit
   @Published var resources: [RegisteredResource] = []
   @Published var error: String?
   @Published var busy = false
+  let fileCatalog = TransferFileCatalog()
   let repository: WalletRepository?
   private let registry: ResourceRegistry?
   private var unlockedAt: Date?
@@ -96,7 +97,7 @@ struct TransferConsole: View {
       Group {
         switch section {
         case "wallet": TransferWalletView(model: model)
-        case "files": TransferWindow()
+        case "files": TransferWindow(catalogModel: model.fileCatalog)
         default: TransferResourcesView(model: model)
         }
       }.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -123,6 +124,7 @@ private struct TransferResourcesView: View {
   @State private var proposed: RegisteredResource?
   @State private var replacing: RegisteredResource?
   @State private var removing: RegisteredResource?
+  @State private var operatorResource: RegisteredResource?
   @State private var address = ""
   private var current: RegisteredResource? { model.resources.first { $0.id == selected } }
 
@@ -165,12 +167,18 @@ private struct TransferResourcesView: View {
             VStack(alignment: .leading, spacing: 16) {
               Text(current.configuration.name).font(.title.bold())
               Label("DevGraph · operator inbox", systemImage: "tray.full")
-              Text("Review incoming requests, select a permission preset and one or more resource paths, then approve the exact grant in your browser Wallet.")
+              Text("Review incoming requests, select a permission preset and one or more resource paths, then approve the exact grant in your Castalia Wallet.")
               Text("A selected container includes the resources beneath it at the time of access. Global access remains limited by the server's operator policy.")
                 .foregroundStyle(.secondary)
+              Button("Review requests & grants in Transfer") { operatorResource = current }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.wallet?.canRequestWorkAccess != true || model.wallet?.operatorAccessProtocol != "castalia.operator-access.v1")
+              if model.wallet?.unlocked != true {
+                Text("Set up or unlock the Castalia Wallet in the Wallet tab to review requests here.").foregroundStyle(.secondary)
+              }
               Button("Open requests & grants in browser") {
                 if !NSWorkspace.shared.open(current.inboxURL) { model.error = "Could not open your browser." }
-              }.buttonStyle(.borderedProminent)
+              }
               Text("Uses the Wallet in your browser. This Transfer Wallet is separate. The server must already authorize that Wallet as an operator.")
                 .font(.callout).foregroundStyle(.secondary)
               Button("Copy inbox address") {
@@ -191,13 +199,16 @@ private struct TransferResourcesView: View {
               Text("Import a public connection file supplied by your server, or look up an HTTPS DevGraph address. Registration saves public settings on this Mac.")
               Text("DevGraph is the first supported resource. A port or a running Hub service alone does not establish ownership or provide a credential-management interface.")
                 .foregroundStyle(.secondary)
-              Text("Approve access in your browser's Wallet. Native grant approvals and other service types are not available in Transfer yet.")
+              Text("Unlock your Castalia Wallet to review DevGraph requests here, or use your browser Wallet. Other service types need a compatible management interface.")
                 .font(.callout).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
           }
         }
       }.frame(maxHeight: .infinity)
     }.padding(24)
+      .sheet(item: $operatorResource) { value in
+        if let repository = model.repository { TransferOperatorView(resource: value, repository: repository, walletModel: model) }
+      }
       .sheet(item: $proposed) { value in
         VStack(alignment: .leading, spacing: 16) {
           Text("Register this resource?").font(.title2.bold())

@@ -25,6 +25,15 @@ private final class ResponseProtocol: URLProtocol {
   override func stopLoading() {}
 }
 final class TransportTests: XCTestCase {
+  func testOperatorExchangePreservesBoundedDefinitiveRejection() async throws {
+    let bytes = Data(#"{"error":"operator_assignment_changed"}"#.utf8)
+    let response = try await transport(status:409,data:bytes).exchange(URLRequest(url:URL(string:"https://example.test/devgraph/access-operator/v1/actions")!),maximum:1024)
+    XCTAssertEqual(response.status,409); XCTAssertEqual(response.data,bytes)
+    do {
+      _ = try await transport(status:409,data:Data(repeating:65,count:1025)).exchange(URLRequest(url:URL(string:"https://example.test")!),maximum:1024)
+      XCTFail("Bounded errors")
+    } catch { }
+  }
   func testDiscoveryIsPublicBoundedAndCannotMoveTheReceiver() async throws {
     let config = try WorkAccessConfiguration(name:"Remote test",receiver:URL(string:"https://example.test")!,issuer:"test",keyID:"key",publicKey:String(repeating:"12",count:32))
     let encoded = try JSONEncoder().encode(config)

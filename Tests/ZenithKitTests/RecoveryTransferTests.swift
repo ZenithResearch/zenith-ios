@@ -148,6 +148,30 @@ final class RecoveryTransferTests: XCTestCase {
     } catch {}
   }
 
+  func testRecoverySelectionRereadsContentsAndRejectsDataOrLinks() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent("old.castaway")
+    let backup = try vectors()[0].file
+    try backup.write(to: url)
+    let discovered = RecoveryFileCatalog.inspect(url)
+    XCTAssertEqual(discovered.format?.kind, .recovery)
+    XCTAssertEqual(try RecoveryFileCatalog.readRecovery(url), backup)
+    let wallet = try WalletRepository(directory: dir.appendingPathComponent("wallet"))
+    _ = try await wallet.create(password: "disposable picker password")
+    let data = try await wallet.exportData(password: "disposable export password")
+    try data.write(to: url)
+    XCTAssertThrowsError(try RecoveryFileCatalog.readRecovery(discovered.url), "Cached recovery row cannot import replaced data")
+    try FileManager.default.removeItem(at: url)
+    XCTAssertThrowsError(try RecoveryFileCatalog.readRecovery(discovered.url))
+    let original = dir.appendingPathComponent("valid.castalia-recovery")
+    try backup.write(to: original)
+    try FileManager.default.createSymbolicLink(at: url, withDestinationURL: original)
+    XCTAssertThrowsError(try RecoveryFileCatalog.readRecovery(url))
+    XCTAssertEqual(try Data(contentsOf: original), backup)
+  }
+
   func testCatalogDistinguishesDeprecatedFilenameFromSupportedFormat() throws {
     let file = try vectors()[0].file
     let current = try RecoveryFileFormat.inspect(file, filename: "wallet.castalia-recovery")

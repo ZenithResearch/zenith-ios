@@ -93,6 +93,16 @@ public enum RecoveryFileCatalog {
     }
   }
 
+  /// Re-read the selected file at import time; a cached discovery row is never
+  /// authority to restore identity. Castaway data cannot become custody by name.
+  public static func readRecovery(_ url: URL) throws -> Data {
+    let data = try EncryptedImportFile.read(url)
+    guard try RecoveryFileFormat.inspect(data, filename: url.lastPathComponent).kind == .recovery else {
+      throw RecoveryTransferError.invalidFile
+    }
+    return data
+  }
+
   public static func inspect(_ url: URL) -> RecoveryCatalogFile {
     let info = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
     var declaredSchema: String?

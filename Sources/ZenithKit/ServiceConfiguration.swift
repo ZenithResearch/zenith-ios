@@ -208,6 +208,30 @@ public final class PrivateTransport: @unchecked Sendable {
     }
     return data
   }
+  /// Operator protocols distinguish a definitive rejection from an uncertain
+  /// result. Preserve bounded status/body while retaining the same TLS,
+  /// redirect, cookie and cancellation boundary as ordinary requests.
+  public func exchange(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> PrivateHTTPResponse {
+    guard request.url?.scheme == "https", request.url?.user == nil, request.url?.password == nil,
+      maximum > 0, maximum <= 1_048_576,
+      lanTrust == nil || request.url.map({ lanTrust!.permits($0) }) == true
+    else { throw WalletFailure.core("service_setup_required") }
+    let (id, session) = try await openSession(); defer { finish(id) }
+    let (bytes, response) = try await session.bytes(for: request, delegate: session.delegate as? URLSessionTaskDelegate)
+    guard let response = response as? HTTPURLResponse, response.url == request.url,
+      response.expectedContentLength < 0 || response.expectedContentLength <= maximum
+    else { throw WalletFailure.core("invalid_response") }
+    var data = Data()
+    for try await byte in bytes {
+      guard data.count < maximum else { throw WalletFailure.invalidFile }; data.append(byte)
+    }
+    return PrivateHTTPResponse(status: response.statusCode, data: data)
+  }
+}
+
+public struct PrivateHTTPResponse: Sendable {
+  public let status: Int
+  public let data: Data
 }
 
 extension MembershipConfiguration {

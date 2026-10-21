@@ -16,6 +16,7 @@ struct TransferWalletView: View {
   @State private var backupPassword = ""
   @State private var backupConfirmation = ""
   @State private var notice: String?
+  @State private var choosingRecovery = false
 
   var body: some View {
     ScrollView {
@@ -51,7 +52,11 @@ struct TransferWalletView: View {
             Text("Create Wallet").tag("create")
           }.pickerStyle(.segmented).onChange(of: mode) { _ in clear() }
           if mode == "import" {
-            Button(selectedName ?? "Choose encrypted recovery file…") { chooseRecovery() }
+            Button(selectedName == nil ? "Choose a saved recovery file…" : "Change recovery file…") { choosingRecovery = true }
+            if let selectedName {
+              Label(selectedName, systemImage: "doc.badge.checkmark").font(.callout)
+              Text("Enter this file’s password, then review the Wallet identity before importing.").font(.caption).foregroundStyle(.secondary)
+            }
             SecureField("Recovery file password", text: $filePassword)
           }
           SecureField("New password for this Mac Wallet", text: $password)
@@ -70,7 +75,7 @@ struct TransferWalletView: View {
         if let notice { Text(notice).foregroundStyle(.secondary) }
         Divider()
         Text("Grant approvals").font(.headline)
-        Text("For now, approve grants using your browser's Wallet from Resources & requests. Native grant approvals are not available in Transfer yet. Unlocking here does not unlock Chrome.")
+        Text("Choose a registered DevGraph in Resources & requests to review its inbox and approve an exact selection using this Castalia Wallet. The server must already authorize your Wallet as an operator. Unlocking here does not unlock Chrome.")
           .foregroundStyle(.secondary)
         Text("This app stores its encrypted Wallet separately from Zenith and Chrome. It locks when you leave the app and after five minutes. Passwords never enter the resource registry.")
           .font(.footnote).foregroundStyle(.secondary)
@@ -78,6 +83,14 @@ struct TransferWalletView: View {
     }.disabled(model.busy)
       .onDisappear { clear(); model.repository?.invalidatePendingWork(); Task { await model.repository?.cancel() } }
       .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in clear() }
+      .sheet(isPresented: $choosingRecovery) {
+        TransferRecoveryPicker(catalog: model.fileCatalog) { file in
+          selectedFile = nil; selectedName = nil; filePassword = ""
+          selectedFile = try RecoveryFileCatalog.readRecovery(file.url)
+          selectedName = file.url.lastPathComponent
+          notice = nil; choosingRecovery = false
+        }
+      }
       .sheet(item: $preview, onDismiss: {
         if !committing {
           model.repository?.invalidatePendingWork()
@@ -116,10 +129,6 @@ struct TransferWalletView: View {
     model.perform({ try await $0.create(password: secret) }) { _ in
       notice = "Wallet created. Export and check a recovery backup next."
     }
-  }
-  private func chooseRecovery() {
-    guard let result = readEncryptedFile() else { return }
-    selectedFile = result.0; selectedName = result.1
   }
   private func prepareImport() {
     guard let selectedFile else { return }

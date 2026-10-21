@@ -10,6 +10,7 @@ public struct WalletState: Decodable, Sendable {
   public let membershipActive: Bool
   public let backupEligible: Bool?
   public let graphAccessProtocol: String?
+  public let operatorAccessProtocol: String?
   public var canRequestWorkAccess: Bool {
     unlocked && (backupEligible ?? backupVerified) && graphAccessProtocol == "castalia.graph-access.v2"
   }
@@ -17,6 +18,7 @@ public struct WalletState: Decodable, Sendable {
     case membershipActive = "membership_active"
     case backupEligible = "backup_eligible"
     case graphAccessProtocol = "graph_access_protocol"
+    case operatorAccessProtocol = "operator_access_protocol"
     case configured, unlocked, revision
     case publicKey = "public_key"
     case backupVerified = "backup_verified"
@@ -364,6 +366,23 @@ public actor WalletRepository {
     let result = try core.invoke(["operation":"approve_graph_access_request_v2","token":preview.token,"now":now])
     try checkLifecycle(ticket)
     return result
+  }
+  /// Separate native operator capability. Never fall back to member consent.
+  public func prepareOperatorAccess(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> OperatorConsent {
+    let ticket = lifecycle.ticket()
+    guard try state().operatorAccessProtocol == "castalia.operator-access.v1",
+      let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.core("operator_update_required") }
+    let data = try core.invoke(["operation":"prepare_operator_access_v1","challenge":text,
+      "pin":JSONSerialization.jsonObject(with:JSONEncoder().encode(pin)),"now":now])
+    let value = try JSONDecoder().decode(OperatorConsent.self, from: data)
+    guard value.summary.native_protocol == "castalia.operator-access.v1" else { throw WalletFailure.invalidFile }
+    try checkLifecycle(ticket)
+    return OperatorConsent(token: value.token, summary: value.summary, lifecycle: ticket)
+  }
+  public func approveOperatorAccess(_ consent: OperatorConsent, now: UInt64) throws -> Data {
+    try Task.checkCancellation(); try checkLifecycle(consent.lifecycle)
+    let result = try core.invoke(["operation":"approve_operator_access_v1","token":consent.token,"now":now])
+    try checkLifecycle(consent.lifecycle); return result
   }
   public func approveGraphReadCredentialV2(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> Data {
     let ticket = lifecycle.ticket()

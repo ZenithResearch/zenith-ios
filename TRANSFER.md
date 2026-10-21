@@ -1,6 +1,6 @@
 # Zenith Transfer
 
-Companion build 6 adds a **Resources & requests** console and an isolated native **Wallet** beside the existing **Transfer files** helper. See [RESOURCE-CONSOLE.md](RESOURCE-CONSOLE.md) for the current implementation and native approval work still required. File discovery and QR transfer remain local and do not unlock or import anything by themselves.
+Companion build 6 adds a **Resources & requests** console and an isolated native **Wallet** beside the existing **Transfer files** helper. See [RESOURCE-CONSOLE.md](RESOURCE-CONSOLE.md) for the current implementation and native approval boundary and installed qualification still required. Build 7 adds a bundled DevGraph grant editor and native Castalia operator approval; the browser remains an option. File discovery and QR transfer remain local and do not unlock or import anything by themselves.
 
 Build 3 adds **Scan laptop QR** and **Use USB cable** to recovery selection, backup checking, and data-file import. Choose the matching destination: a recovery file restores signing identity; an ordinary Castaway data file requires a matching wallet. Transfer never performs the import itself.
 
