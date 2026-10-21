@@ -17,6 +17,10 @@ struct TransferWalletView: View {
   @State private var backupConfirmation = ""
   @State private var notice: String?
   @State private var choosingRecovery = false
+  @State private var reuseFilePassword = true
+  private var importPassword: String? {
+    TransferPasswordRules.importPassword(file: filePassword, local: password, confirmation: confirmation, reuse: reuseFilePassword)
+  }
 
   var body: some View {
     ScrollView {
@@ -33,16 +37,17 @@ struct TransferWalletView: View {
             Button("Lock Wallet") { clear(); model.lock() }
             Divider()
             Text("Recovery backup").font(.headline)
-            SecureField("Backup file password", text: $backupPassword)
-            SecureField("Confirm backup file password", text: $backupConfirmation)
+            TransferPasswordField(title: "Backup file password", text: $backupPassword)
+            TransferPasswordField(title: "Confirm backup file password", text: $backupConfirmation)
+            Text("Use at least 12 characters for a new encrypted backup.").font(.caption).foregroundStyle(.secondary)
             Button("Export encrypted recovery file…") { exportBackup() }
-              .disabled(model.busy || backupPassword.isEmpty || backupPassword != backupConfirmation)
+              .disabled(model.busy || !TransferPasswordRules.permitsLocal(backupPassword) || backupPassword != backupConfirmation)
             Button("Check an existing backup…") { verifyBackup() }
               .disabled(model.busy || backupPassword.isEmpty)
             Text("Export saves an encrypted copy. Checking it confirms that the file can restore this Wallet.")
               .font(.callout).foregroundStyle(.secondary)
           } else {
-            SecureField("Wallet unlock password", text: $password).onSubmit { unlock() }
+            TransferPasswordField(title: "Wallet unlock password", text: $password, submit: unlock)
             Button("Unlock Wallet") { unlock() }.buttonStyle(.borderedProminent)
               .disabled(model.busy || password.isEmpty)
           }
@@ -57,18 +62,37 @@ struct TransferWalletView: View {
               Label(selectedName, systemImage: "doc.badge.checkmark").font(.callout)
               Text("Enter this file’s password, then review the Wallet identity before importing.").font(.caption).foregroundStyle(.secondary)
             }
-            SecureField("Recovery file password", text: $filePassword)
+            TransferPasswordField(title: "Recovery-file password", text: $filePassword)
+            Text("Decrypts your existing backup. It does not change the backup file’s password.")
+              .font(.caption).foregroundStyle(.secondary)
+            Toggle("Use the same password to unlock Transfer on this Mac", isOn: $reuseFilePassword)
+              .onChange(of: reuseFilePassword) { _ in password = ""; confirmation = "" }
+            if reuseFilePassword {
+              Text("Transfer saves a separate encrypted Wallet copy using this password. Your identity and recovery file stay the same.")
+                .font(.caption).foregroundStyle(.secondary)
+              if !filePassword.isEmpty && !TransferPasswordRules.permitsLocal(filePassword) {
+                Text("Transfer needs an unlock password of at least 12 characters, up to 4096 UTF-8 bytes. Turn off the option above to choose a separate password; your recovery-file password stays unchanged.")
+                  .font(.callout).foregroundStyle(.secondary)
+              }
+            }
           }
-          SecureField("New password for this Mac Wallet", text: $password)
-          SecureField("Confirm new password", text: $confirmation)
+          if mode == "create" || !reuseFilePassword {
+            TransferPasswordField(title: "Unlock password for Transfer on this Mac", text: $password)
+            TransferPasswordField(title: "Confirm unlock password", text: $confirmation)
+            Text("At least 12 characters. This protects only Transfer’s local Wallet copy; it does not change your recovery backup or other apps.")
+              .font(.caption).foregroundStyle(.secondary)
+            if !confirmation.isEmpty && password != confirmation {
+              Text("The unlock passwords do not match.").font(.callout).foregroundStyle(.secondary)
+            }
+          }
           if mode == "create" {
             Button("Create this app's Wallet") { create() }.buttonStyle(.borderedProminent)
-              .disabled(model.busy || password.isEmpty || password != confirmation)
+              .disabled(model.busy || !TransferPasswordRules.permitsLocal(password) || password != confirmation)
             Text("A new identity will not inherit authority from any existing Wallet. Import your own recovery file to use your existing identity.")
               .font(.callout).foregroundStyle(.secondary)
           } else {
             Button("Review Wallet import") { prepareImport() }.buttonStyle(.borderedProminent)
-              .disabled(model.busy || selectedFile == nil || filePassword.isEmpty || password.isEmpty || password != confirmation)
+              .disabled(model.busy || selectedFile == nil || importPassword == nil)
           }
         } else { ProgressView("Loading Wallet…") }
         if model.busy { ProgressView() }
@@ -114,9 +138,12 @@ struct TransferWalletView: View {
         }.padding(24).frame(width: 560)
       }
   }
-  private func clear() {
+  private func clearPasswords() {
     password = ""; confirmation = ""; filePassword = ""
-    backupPassword = ""; backupConfirmation = ""; selectedFile = nil; selectedName = nil; preview = nil
+    backupPassword = ""; backupConfirmation = ""
+  }
+  private func clear() {
+    clearPasswords(); selectedFile = nil; selectedName = nil; preview = nil
   }
   private func unlock() {
     guard !password.isEmpty else { return }; let secret = password; password = ""
@@ -131,8 +158,9 @@ struct TransferWalletView: View {
     }
   }
   private func prepareImport() {
-    guard let selectedFile else { return }
-    let old = filePassword, new = password; clear()
+    guard let selectedFile, let new = importPassword else { return }
+    let old = filePassword; clearPasswords()
+    model.error = nil; notice = nil
     model.perform({ try await $0.prepareRestore(file: selectedFile, filePassword: old, password: new) }) {
       committing = false; preview = ImportReview(preview: $0)
     }

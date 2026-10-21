@@ -61,7 +61,10 @@ import ZenithKit
       } catch {
         wallet = try? await repository.state(); busy = false
         guard generation == expected else { return }
-        self.error = "Wallet could not complete this step. Check the selected file and passwords, or unlock again."
+        // WalletFailure exposes a closed, password-free set of messages. Never
+        // display arbitrary native/system error text or interpolate input.
+        self.error = (error as? WalletFailure)?.errorDescription
+          ?? "Wallet could not complete this step. No password or key has been logged."
       }
     }
   }
