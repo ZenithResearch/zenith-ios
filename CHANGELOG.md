@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Pin the published operator Wallet source and verified DevGraph editor provenance for Transfer build 10 — make the reviewed native resource console reproducible without changing its custody or grant behavior.
+
 ### Added
 
 - Discover owner-protected services from ~/.zenith/resources/v1 in Transfer build 9 — review public local connection settings without manually finding a server URL or importing authority. Separate configured monitors from Wallet-ready HTTPS services and keep saved issuer/TLS pins unchanged until review.
