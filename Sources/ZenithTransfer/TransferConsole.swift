@@ -6,6 +6,9 @@ import ZenithKit
 @MainActor final class TransferModel: ObservableObject {
   @Published var wallet: WalletState?
   @Published var resources: [RegisteredResource] = []
+  @Published var localResources: [LocalResource] = []
+  @Published var discovering = false
+  @Published var discoveryNotice: String?
   @Published var error: String?
   @Published var busy = false
   let fileCatalog = TransferFileCatalog()
@@ -26,6 +29,15 @@ import ZenithKit
     } catch { self.error = "Transfer storage is unavailable." }
     repository = loadedRegistry == nil ? nil : loadedRepository
     registry = loadedRegistry
+  }
+  func discoverLocalResources() async {
+    guard !discovering else { return }
+    discovering = true
+    let result = await Task.detached { LocalResourceDiscovery.scan() }.value
+    localResources = result.resources
+    discoveryNotice = result.unavailable ? "The local resource registry could not be read safely." :
+      (result.rejected > 0 ? "Some unsupported or invalid resource records were skipped." : nil)
+    discovering = false
   }
   func refresh() async {
     do {
@@ -104,7 +116,10 @@ struct TransferConsole: View {
         default: TransferResourcesView(model: model)
         }
       }.frame(maxWidth: .infinity, maxHeight: .infinity)
-    }.task { await model.refresh() }
+    }.task { await model.refresh(); await model.discoverLocalResources() }
+      .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+        Task { await model.discoverLocalResources() }
+      }
       .onReceive(clock) { _ in model.expire() }
       .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in model.lock() }
       .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.lock() }
@@ -130,6 +145,7 @@ private struct TransferResourcesView: View {
   @State private var operatorResource: RegisteredResource?
   @State private var address = ""
   private var current: RegisteredResource? { model.resources.first { $0.id == selected } }
+  private var currentLocal: LocalResource? { model.localResources.first { $0.id == selected } }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -139,6 +155,9 @@ private struct TransferResourcesView: View {
           Text("Choose a service to review its access requests and grants.").foregroundStyle(.secondary)
         }
         Spacer()
+        Button(model.discovering ? "Checking this Mac…" : "Refresh local services") {
+          Task { await model.discoverLocalResources() }
+        }.disabled(model.discovering)
         Button("Import connection file") { importProfile() }
       }
       HStack {
@@ -151,7 +170,26 @@ private struct TransferResourcesView: View {
       HStack(alignment: .top, spacing: 24) {
         ScrollView {
           VStack(alignment: .leading, spacing: 10) {
-            if model.resources.isEmpty { Text("No resources registered").foregroundStyle(.secondary) }
+            Text("On this Mac").font(.headline)
+            if model.localResources.isEmpty {
+              Text(model.discovering ? "Checking the resource registry…" : "No local services registered").foregroundStyle(.secondary)
+            }
+            ForEach(model.localResources) { resource in
+              Button { selected = resource.id } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                  Label(resource.name, systemImage: "desktopcomputer").font(.headline)
+                  Text(resource.endpoint).font(.caption).foregroundStyle(.secondary)
+                  Text(resource.connection == nil ? "Connection setup needed" : "Review connection settings")
+                    .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                  .background(selected == resource.id ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
+                  .cornerRadius(10)
+              }.buttonStyle(.plain)
+            }
+            if let notice = model.discoveryNotice { Text(notice).font(.caption).foregroundStyle(.secondary) }
+            Divider().padding(.vertical, 8)
+            Text("Saved connections").font(.headline)
+            if model.resources.isEmpty { Text("No saved connections").foregroundStyle(.secondary) }
             ForEach(model.resources) { resource in
               Button { selected = resource.id } label: {
                 VStack(alignment: .leading, spacing: 4) {
@@ -196,10 +234,32 @@ private struct TransferResourcesView: View {
               Text("Removing a registration does not stop the service or revoke anyone's access.")
                 .font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
+          } else if let local = currentLocal {
+            VStack(alignment: .leading, spacing: 16) {
+              Text(local.name).font(.title.bold())
+              Label("DevGraph · configured on this Mac", systemImage: "desktopcomputer")
+              Text(local.endpoint).textSelection(.enabled)
+              Text("Resource ID: \(local.id)").font(.caption.monospaced()).textSelection(.enabled)
+              Text("Discovered in ~/.zenith/resources/v1. This is public configuration, not proof that the service is running or that your Wallet owns it.")
+                .foregroundStyle(.secondary)
+              if let configuration = local.connection {
+                Button("Review connection") { do { propose(try RegisteredResource(configuration: configuration)) }
+                  catch { model.error = "This service needs valid public connection settings." } }
+                  .buttonStyle(.borderedProminent)
+                connection(configuration)
+              } else {
+                Text("Wallet connection setup needed").font(.headline)
+                Text("This DevGraph advertises its local monitor, but has not published HTTPS Wallet issuer settings. Configure its Wallet access endpoint, then publish its public connection file. No local bearer or signing key is imported here.")
+                  .foregroundStyle(.secondary)
+                Button("Open local monitor") { NSWorkspace.shared.open(local.monitorURL) }
+              }
+              Text("Registration does not grant operator access or change certificate trust. The server checks your Wallet when you review requests.")
+                .font(.callout).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
           } else {
             VStack(alignment: .leading, spacing: 16) {
               Text("Your resource console").font(.title.bold())
-              Text("Import a public connection file supplied by your server, or look up an HTTPS DevGraph address. Registration saves public settings on this Mac.")
+              Text("Choose a service discovered on this Mac, import a public connection file, or look up an HTTPS DevGraph address. Review its public settings before saving a connection.")
               Text("DevGraph is the first supported resource. A port or a running Hub service alone does not establish ownership or provide a credential-management interface.")
                 .foregroundStyle(.secondary)
               Text("Unlock your Castalia Wallet to review DevGraph requests here, or use your browser Wallet. Other service types need a compatible management interface.")

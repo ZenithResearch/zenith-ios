@@ -1,8 +1,13 @@
 # Resource and credential console
 
-Zenith Transfer build 8 includes native Castalia operator consent to the resource console introduced in build 6. Encrypted recovery-file QR transfer is preserved. This is local development software, not a notarized distribution build.
+Zenith Transfer build 9 includes native Castalia operator consent to the resource console introduced in build 6. Encrypted recovery-file QR transfer is preserved. This is local development software, not a notarized distribution build.
 
 ## Resource registration and requests
+
+**On this Mac** reads owner-protected public service records from `~/.zenith/resources/v1`. It refreshes at launch, app activation and on demand. Discovery performs no network request, grants no access and never reads `.zenith/config.json`, Wallet databases, local bearer files or private service configuration. It shows discovered services separately from saved connections. An instance UUID stays independent of its endpoint and Wallet identity.
+
+Review a Wallet-ready service's public connection before saving it. Changed local records never silently replace saved issuer or TLS settings. A loopback-only monitor without an HTTPS Wallet profile is shown as needing connection setup; registration cannot make that legacy API an operator endpoint. The reader bounds records/counts, holds private owner-owned directories, rejects links/unsafe permissions and malformed closed JSON, and skips unsupported records. The record is advisory configuration rather than a liveness or owner-signature claim. DevGraph's matching opt-in `local resource register` publisher and `local start/restart` refresh hook are described in its `docs/dev/local-resource-discovery.md`; the same 22 vectors are tested by both producers and consumers. Other resource adapters remain separate work.
+
 
 Import a closed, bounded DevGraph public connection file or look up `/.well-known/devgraph-connection.json` at an explicitly entered HTTPS origin. Lookup sends no Wallet identity. Review the origin, issuer key and optional LAN certificate fingerprint before registration. Replacing settings shows both versions and rejects stale saved records. Registration does not establish ownership, authorize an operator, grant member access or install browser/system certificate trust.
 
