@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- Discover owner-protected services from ~/.zenith/resources/v1 in Transfer build 9 — review public local connection settings without manually finding a server URL or importing authority. Separate configured monitors from Wallet-ready HTTPS services and keep saved issuer/TLS pins unchanged until review.
+
+- Add opt-in password reveal and explicit Copy controls throughout Transfer Wallet — allow inspection and native paste without showing or copying passwords automatically. Build 8.
+
+- Add explicit native operator consent and a bundled, origin-bound DevGraph grant editor in Transfer build 7 — keep private signing inside Castalia while preserving original-action recovery after uncertain responses. Native member consent remains narrow.
+- Share the discovered recovery-file catalog between Wallet import and QR transfer — select existing backups by filename, date and folder without browsing again; distinguish data files and re-read recovery contents before identity review.
+
+- Add the Transfer resource registry, isolated native Wallet setup and per-resource browser inbox entry — reuse the working grant flow while explicitly refusing to pass native operator approvals through member consent. Build 6 reuses Zenith artwork and preserves file transfer; native operator signing and generic service adapters remain open.
+
 ### Changed
+
+- Reuse the recovery-file password for Transfer’s local unlock by default, while allowing a separate local password — avoid forcing an unexplained replacement password. Show the native minimum before submission, keep the selected encrypted file after failed preparation and display only closed Wallet error messages.
+
+- Reject stale-path symlinks before coordinated encrypted-file reads and open descriptors without following final links — cached discovery metadata must not redirect Wallet import. Stage packaged app replacements instead of overwriting a running executable.
+
+- Use a bounded native resource tree with explicit inherited coverage — global requests and multiple container roots must remain separate from operation presets without rewriting stored requests.
 
 - Separate permission presets from a global request or multi-select resource hierarchy — retain exact v2 preferences while making descendant inheritance and multiple Arena/Initiative/Project roots explicit.
 

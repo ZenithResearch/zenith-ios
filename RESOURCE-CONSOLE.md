@@ -1,6 +1,6 @@
 # Resource and credential console
 
-Zenith Transfer build 9 includes native Castalia operator consent to the resource console introduced in build 6. Encrypted recovery-file QR transfer is preserved. This is local development software, not a notarized distribution build.
+Zenith Transfer build 10 includes native Castalia operator consent to the resource console introduced in build 6. Encrypted recovery-file QR transfer is preserved. This is local development software, not a notarized distribution build.
 
 ## Resource registration and requests
 
@@ -44,8 +44,23 @@ Canonical task: `Task/zenith-transfer-resource-credentials`, under `Issue/devgra
 - Rust core/native suites, repository npm tests/type checks, all three pinned Apple framework slices, Swift tests and JavaScript syntax checks qualify the component change. Build provenance pins the exact Wallet revision; existing custody/snapshot formats and member APIs remain unchanged.
 - Real-core Swift tests verify disclosure, Ed25519 transcript, one use, lock invalidation and continued rejection of operator actions by member consent. Journal tests preserve unknown originals across reload and reject changed actions/dispatch rollback/extra secret-bearing fields. Transport tests preserve bounded definitive error status/body.
 - Actual WKWebView tests use a disposable Wallet and synthetic server: no action before native consent; accepted inbox proof; a standing-grant decision with an intentionally incomplete response; reopening and status-only recovery without another decision; refusal of direct Work/custody calls and an action/purpose mismatch. These are component fixtures, not installed server activation or issuer qualification.
-- Build 6 Resources/Wallet setup and build 7’s recovery catalog, filtering and data-file separation were visually inspected. Build 8 password controls still need installed visual review; real selected-resource qualification requires a human-controlled operator Wallet. Opening/importing/registration never substitutes for server admission. Do not mark the whole MVP complete from component tests.
+- Build 6 Resources/Wallet setup and build 7’s recovery catalog, filtering and data-file separation were visually inspected. Build 8 password controls were visually reviewed and the user completed recovery import. Build 9 shows the locally registered DevGraph and preserves the configured locked Wallet; that private host still needs a reviewed HTTPS Wallet profile. Real selected-resource qualification requires a human-controlled operator Wallet. Opening/importing/registration never substitutes for server admission. Do not mark the whole MVP complete from component tests.
 
 Remaining: installed native grant/revocation and retained-credential qualification; active-grant revision with prefill/diff/monotonic revision/atomic replacement; generic owner-signed resource-management descriptors and Hub adapters; further descendant/move/race tests; physical iPad picker/write acceptance. Nostr/Matrix notifications, cross-graph sync and merging this console into the main Zenith app remain separate work.
 
 Build with Xcode's toolchain using `swift test` and `sh scripts/build-transfer-app.sh`. The packager stages a new bundle and preserves the previous app instead of overwriting an executable mapped by a running process. It includes the offline resource bundle in Contents/Resources and reuses Zenith's established icon.
+
+## Coordinated release
+
+Wallet source is pinned to the graph-access/operator candidate in Wallet PR 33.
+The bundled editor comes from the reviewed DevGraph access candidate; source
+provenance remains explicit and registration confers no authority. Operator
+identity is a Wallet public key admitted by receiver-held policy. A separate
+portable admin credential is follow-on work, not an MVP requirement.
+
+A source merge/build does not configure a server. The existing default private
+DevGraph host and opt-in combined HTTPS receiver are distinct compositions.
+Publish the actual receiver profile, review issuer/TLS changes and preserve
+retained grants and replay state before installed qualification. Fresh CI and
+clean-source build evidence are required for the release candidate; previous
+disposable browser/iPad passes do not certify this native operator deployment.
