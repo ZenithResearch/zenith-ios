@@ -135,3 +135,52 @@ public extension DevgraphReadClient {
     return try WorkAccessCatalog.decode(data, receiver: configuration.origin, issuer: configuration.issuer)
   }
 }
+
+/// Presentation-only path union; exact grants remain a server/operator decision.
+public enum WorkScopeSelection {
+  public static func covers(_ parent: WorkResourcePath, _ child: WorkResourcePath) -> Bool {
+    parent.path.allSatisfy { child.path.contains($0) }
+  }
+  public static func normalized(_ paths: [WorkResourcePath]) throws -> [WorkResourcePath] {
+    for path in paths { try path.validate() }
+    var unique: [WorkResourcePath] = []
+    for path in paths where !unique.contains(path) { unique.append(path) }
+    let roots = unique.filter { path in !unique.contains { $0 != path && covers($0, path) } }
+    guard roots.count <= 16 else { throw WalletFailure.core("too_many_resource_paths") }
+    return roots
+  }
+  public static func label(_ path: WorkResourcePath, scopes: [WorkScopeOption]) -> String {
+    path.path.map { anchor in
+      guard let row = scopes.first(where: { $0.resource == anchor }) else { return anchor }
+      return "\(row.kind): \(row.title)"
+    }.joined(separator: " → ")
+  }
+  public static func tree(_ scopes: [WorkScopeOption]) -> [WorkScopeTreeNode] {
+    let byPath = Dictionary(uniqueKeysWithValues: scopes.map { ($0.resource_path.path, $0.resource) })
+    var grouped: [String: [WorkScopeOption]] = [:]
+    for row in scopes {
+      var parent = ""
+      if row.resource_path.path.count > 1 {
+        for length in stride(from: row.resource_path.path.count - 1, through: 1, by: -1) {
+          if let found = byPath[Array(row.resource_path.path.prefix(length))] { parent = found; break }
+        }
+      }
+      grouped[parent, default: []].append(row)
+    }
+    func children(_ identifier: String) -> [WorkScopeTreeNode] {
+      (grouped[identifier] ?? [])
+        .sorted { $0.title == $1.title ? $0.resource < $1.resource : $0.title < $1.title }
+        .map { row in
+          let nested = children(row.resource)
+          return WorkScopeTreeNode(option: row, children: nested.isEmpty ? nil : nested)
+        }
+    }
+    return children("")
+  }
+}
+public struct WorkScopeTreeNode: Identifiable, Sendable {
+  public let option: WorkScopeOption
+  public let children: [WorkScopeTreeNode]?
+  public var id: String { option.resource }
+  public init(option: WorkScopeOption, children: [WorkScopeTreeNode]?) { self.option = option; self.children = children }
+}

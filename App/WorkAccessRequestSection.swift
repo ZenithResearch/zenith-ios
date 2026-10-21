@@ -11,7 +11,7 @@ struct WorkAccessRequestSection: View {
   @State private var choosing = false
   @State private var presetID = ""
   @State private var paths: [WorkResourcePath] = []
-  @State private var areaPreview: WorkResourcePath?
+  @State private var globalScope = true
   var body: some View {
     Section {
       if let consent {
@@ -20,7 +20,7 @@ struct WorkAccessRequestSection: View {
         if let preference = consent.preference {
           LabeledContent("Requested preset", value: preference.id ?? "Operator chooses")
           ForEach(preference.resource_paths ?? [], id: \.self) { Text($0.summary) }
-          if preference.resource_paths?.isEmpty != false { Text("Area: operator chooses") }
+          if preference.resource_paths?.isEmpty != false { Text("No path restriction requested · Operator chooses the exact scope") }
         }
         Text("Your Wallet sends proof of identity and this request. The operator chooses the permissions; this step grants no access.")
         LabeledContent("Approval expires",value:consent.approvalExpires.formatted())
@@ -33,6 +33,8 @@ struct WorkAccessRequestSection: View {
         Button("Refresh this approval") { prepare(resubmit:!consent.checkingStatus) }.disabled(model.busy)
       } else if choosing {
         if let catalog {
+          Text("Permissions · What can they do?").font(.headline)
+          Text("Presets select operations; resource scope is chosen separately below.").font(.footnote)
           Picker("Access preset", selection: $presetID) {
             Text("No preset · Operator chooses").tag("")
             ForEach(catalog.presets) { Text($0.name).tag($0.id) }
@@ -41,12 +43,12 @@ struct WorkAccessRequestSection: View {
             Text("Requested permissions").font(.subheadline)
             Text((preset.read_operations.map { "Read: \($0)" } + preset.write_operations.map { $0.replacingOccurrences(of:"devgraph.work.",with:"").replacingOccurrences(of:".v2",with:"") }).joined(separator:" · ")).font(.footnote)
           }
-          WorkRequestAreaPicker(scopes: catalog.scopes, paths: $paths, currentPath: $areaPreview)
+          WorkRequestAreaPicker(scopes: catalog.scopes, paths: $paths, globalScope: $globalScope)
           Text("The operator can narrow this request. Paths apply to resources beneath them at each access, including new descendants; moved-out resources lose access.").font(.footnote)
           Button("Review access request") {
-            do { let preference = try WorkAccessPreference(catalog:catalog,presetID:presetID.isEmpty ? nil:presetID,paths:paths + (areaPreview.map { paths.contains($0) ? [] : [$0] } ?? [])); prepare(preference:preference) }
+            do { let preference = try WorkAccessPreference(catalog:catalog,presetID:presetID.isEmpty ? nil:presetID,paths:globalScope ? [] : paths); prepare(preference:preference) }
             catch { model.error = "Choose an available preset and area, then try again." }
-          }.disabled(model.busy)
+          }.disabled(model.busy || (!globalScope && paths.isEmpty))
         } else {
           Text("This server’s access choices could not be loaded. Retry, or send a general request so its operator can choose your permissions.")
           Button("Load server choices") { beginChoice() }.disabled(model.busy)
@@ -63,7 +65,7 @@ struct WorkAccessRequestSection: View {
           if ["active","denied","expired","revoked","superseded","partially_active"].contains(result.status) {
             Button("Request different access") {
               model.perform({ _ in try await client.startNewAccessRequest(store:store,after:result) }) { _ in
-                self.result=nil;catalog=nil;presetID="";paths=[];areaPreview=nil;beginChoice()
+                self.result=nil;catalog=nil;presetID="";paths=[];globalScope=true;beginChoice()
               }
             }.disabled(model.busy)
           }
@@ -73,7 +75,7 @@ struct WorkAccessRequestSection: View {
         Button(result == nil ? "Request or check access" : "Check request") { beginChoice() }.disabled(model.busy)
       }
     } header: { Text("Request access") } footer: { Text("An approved grant can be reused while valid. Choose Continue below to review exact read permissions in Wallet. Requesting access never grants it automatically.") }
-    .onChange(of:model.generation) { _,_ in consent=nil;choosing=false;catalog=nil;result=nil;paths=[];areaPreview=nil;presetID="" }
+    .onChange(of:model.generation) { _,_ in consent=nil;choosing=false;catalog=nil;result=nil;paths=[];globalScope=true;presetID="" }
   }
   private func beginChoice() {
     model.perform({ _ -> (Bool, WorkAccessCatalog?) in
@@ -104,32 +106,58 @@ struct WorkAccessRequestSection: View {
 struct WorkRequestAreaPicker: View {
   let scopes: [WorkScopeOption]
   @Binding var paths: [WorkResourcePath]
-  @Binding var currentPath: WorkResourcePath?
-  @State private var arena = ""
-  @State private var initiative = ""
-  @State private var project = ""
-  private var initiatives: [WorkScopeOption] { scopes.filter { $0.kind == "Initiative" && (arena.isEmpty || $0.resource_path.path.contains(arena)) } }
-  private var projects: [WorkScopeOption] { scopes.filter { $0.kind == "Project" && (arena.isEmpty || $0.resource_path.path.contains(arena)) && (initiative.isEmpty || $0.resource_path.path.contains(initiative)) } }
-  private var current: WorkResourcePath? { scopes.first { $0.resource == (project.isEmpty ? (initiative.isEmpty ? arena:initiative):project) }?.resource_path }
+  @Binding var globalScope: Bool
+  @State private var query = ""
+  @State private var selectionError: String?
+  private func filtered(_ nodes: [WorkScopeTreeNode]) -> [WorkScopeTreeNode] {
+    guard !query.isEmpty else { return nodes }
+    return nodes.compactMap { node in
+      if (node.option.title + " " + node.option.resource).localizedCaseInsensitiveContains(query) { return node }
+      let children = filtered(node.children ?? [])
+      return children.isEmpty ? nil : WorkScopeTreeNode(option: node.option, children: children)
+    }
+  }
   var body: some View {
     Group {
-    Text("Area").font(.headline)
-    if scopes.isEmpty { Text("No areas are published for discovery. The operator will choose your scope.").font(.footnote) }
-    else {
-      Picker("Arena",selection:$arena) { Text("Operator chooses area").tag("");ForEach(scopes.filter { $0.kind == "Arena" }) { Text($0.title).tag($0.resource) } }
-        .onChange(of:arena) { _,_ in initiative="";project="" }
-      Picker("Initiative",selection:$initiative) { Text("Any in selected area").tag("");ForEach(initiatives) { Text($0.title).tag($0.resource) } }
-        .onChange(of:initiative) { _,_ in project="" }
-      Picker("Project",selection:$project) { Text("Any in selected area").tag("");ForEach(projects) { Text($0.title).tag($0.resource) } }
-      if let current {
-        Text(current.summary).font(.footnote)
-        Button("Keep this area and add another") { if !paths.contains(current) { paths.append(current) };arena="";initiative="";project="" }.disabled(paths.count>=16 || paths.contains(current))
+      Text("Resources · Where can they do it?").font(.headline)
+      Picker("Resource scope", selection: $globalScope) {
+        Text("Global request").tag(true)
+        Text("Selected areas").tag(false)
+      }.pickerStyle(.segmented)
+      if globalScope {
+        Text("Request no path restriction. The operator still chooses and approves the exact scope within their policy. This grants no access by itself.").font(.footnote)
+      } else {
+        TextField("Find resources by title, kind or ID", text: $query)
+        Text("Choose multiple Arenas, Initiatives or Projects. Selecting a container includes its current and future descendants. Clear a selected parent before narrowing an inherited branch.").font(.footnote)
+        if scopes.isEmpty { Text("No resource hierarchy is published for selection.") }
+        OutlineGroup(filtered(WorkScopeSelection.tree(scopes)), children: \.children) { node in
+          let path = node.option.resource_path
+          let inherited = paths.first { $0 != path && WorkScopeSelection.covers($0, path) }
+          Toggle(isOn: Binding(get: { paths.contains(path) || inherited != nil }, set: { selected in
+            do {
+              paths = try WorkScopeSelection.normalized(selected ? paths + [path] : paths.filter { $0 != path })
+              selectionError = nil
+            } catch { selectionError = "Select up to 16 separate areas, or choose a shared parent." }
+          })) {
+            VStack(alignment: .leading, spacing: 3) {
+              Text(node.option.title)
+              Text(node.option.resource).font(.caption).foregroundStyle(.secondary)
+              if let inherited { Text("Inherited from " + WorkScopeSelection.label(inherited, scopes: scopes)).font(.caption) }
+              else { Text("Includes this \(node.option.kind) and its descendants").font(.caption).foregroundStyle(.secondary) }
+            }
+          }.toggleStyle(.button).disabled(inherited != nil)
+        }
+        if let selectionError { Text(selectionError).foregroundStyle(.red) }
+        Text("Selected roots (\(paths.count)/16)").font(.subheadline)
+        ForEach(paths, id: \.self) { path in
+          HStack {
+            Text(WorkScopeSelection.label(path, scopes: scopes)).font(.footnote)
+            Spacer()
+            Button("Remove", role: .destructive) { paths.removeAll { $0 == path } }
+          }
+        }
+        if paths.isEmpty { Text("Choose at least one area to continue.").font(.footnote) }
       }
-      ForEach(paths,id:\.self) { path in
-        HStack { Text(path.summary).font(.footnote);Spacer();Button("Remove",role:.destructive) { paths.removeAll { $0 == path } } }
-      }
-      if paths.isEmpty && current == nil { Text("No area selected · Operator chooses").font(.footnote) }
     }
-    }.onChange(of:current) { _,value in currentPath=value }
   }
 }

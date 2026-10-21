@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Separate permission presets from a global request or multi-select resource hierarchy — retain exact v2 preferences while making descendant inheritance and multiple Arena/Initiative/Project roots explicit.
+
+- Use the versioned native graph API and verify its ABI while preserving existing Wallet data — graph requests depend on custody/backup and resource policy rather than a universal community membership gate.
+
+
 ### Added
 
 - Add the explicit dated/until-revoked grant validity reader and common rejection/attenuation vectors — mobile clients need the same lifetime semantics as the server while old connections remain unchanged.

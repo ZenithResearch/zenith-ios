@@ -51,4 +51,27 @@ final class AccessCatalogTests: XCTestCase {
     let saved = try Data(contentsOf:directory.appendingPathComponent("history/"+first.requestID+".json"))
     XCTAssertEqual(try JSONDecoder().decode(WorkAccessRequestRecord.self,from:saved),first)
   }
+  func testHierarchicalUnionAndIndependentGlobalPreference() throws {
+    let a = try WorkResourcePath(path:["Arena/a"])
+    let ap = try WorkResourcePath(path:["Arena/a","Project/p"])
+    let bi = try WorkResourcePath(path:["Arena/b","Initiative/i"])
+    XCTAssertEqual(try WorkScopeSelection.normalized([ap,bi,a]),[bi,a])
+    XCTAssertFalse(WorkScopeSelection.covers(a,bi))
+    XCTAssertThrowsError(try WorkScopeSelection.normalized((0..<17).map { try WorkResourcePath(path:["Project/p\($0)"]) }))
+    let catalog = try catalog()
+    let global = try WorkAccessPreference(catalog:catalog,presetID:"project-manager",paths:[])
+    XCTAssertNil(global.resource_paths)
+    XCTAssertEqual(global.id,"project-manager")
+  }
+  func testResourceTreeUsesTitlesWithoutInventingHiddenAncestors() throws {
+    let catalog = try catalog(), tree = WorkScopeSelection.tree(catalog.scopes)
+    XCTAssertEqual(tree.count,1)
+    XCTAssertEqual(tree.first?.children?.first?.children?.first?.id,"Project/project-a")
+    XCTAssertEqual(WorkScopeSelection.label(try XCTUnwrap(catalog.scopes.last).resource_path,scopes:catalog.scopes),"Arena: A → Initiative: Fixture → Project: Fixture")
+    let scope = WorkScopeOption(resource_path:try WorkResourcePath(path:["Project/p"]),resource:"Project/p",title:"Visible project",parent:nil)
+    let standalone = WorkScopeSelection.tree([scope])
+    XCTAssertEqual(standalone.count,1)
+    XCTAssertNil(standalone.first?.children)
+  }
+
 }

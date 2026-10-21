@@ -150,3 +150,14 @@ Existing servers and saved requests retain their original protocol. Unknown outc
 check the original ID; **Request different access** is offered only after a known
 result, with the previous public request archived. A new client installation does
 not activate server grants or extend an expired test window.
+
+### Resource scope selection
+
+Work access requests separate the permission preset from the resource scope. Global
+requests carry no explicit path restriction; the operator chooses the actual grant
+within its policy. Selected areas use a native disclosure hierarchy with searchable
+titles, typed IDs, multiple roots and inherited descendants. A selected container
+covers current/future descendants at access time; moving work out removes that
+coverage. The UI normalizes redundant child roots and limits independent roots to
+16. Existing v2 requests, original IDs and signed bytes are unchanged. Installing
+this picker does not activate or expand a grant.
