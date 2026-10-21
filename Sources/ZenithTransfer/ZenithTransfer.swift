@@ -9,12 +9,12 @@ import ZenithKit
 struct ZenithTransferApp: App {
   var body: some Scene {
     WindowGroup("Zenith Transfer") {
-      TransferWindow().frame(minWidth: 820, minHeight: 640)
+      TransferConsole().frame(minWidth: 920, minHeight: 680)
     }.defaultSize(width: 980, height: 780)
   }
 }
 
-private struct TransferWindow: View {
+struct TransferWindow: View {
   @State private var choosing = false
   @State private var sections: [RecoveryCatalogSection] = []
   @State private var loading = false
