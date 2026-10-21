@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Resolve Cargo output for native framework packaging — allow clean builds on a scratch volume without assuming source-local artifacts.
+
 ### Changed
 
 - Pin the published operator Wallet source and verified DevGraph editor provenance for Transfer build 10 — make the reviewed native resource console reproducible without changing its custody or grant behavior.

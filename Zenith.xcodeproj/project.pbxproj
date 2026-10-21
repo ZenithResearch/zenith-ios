@@ -18,7 +18,6 @@
 		49F7F67AE5F4BE68E71AA6A0 /* TailscaleDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */; };
 		4DDB84468536881BD449B3BB /* TailscaleKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		543896E9AF6F7BD1E05FABBB /* HermesChatKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25D0F3A41C6DB693A5D6406 /* HermesChatKeychain.swift */; };
-		544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */ = {isa = PBXBuildFile; fileRef = 3E750ECFD3FF478351FC7691 /* Membership.json */; };
 		58458AC95679375C5492881B /* TailscaleKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */; };
 		587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */ = {isa = PBXBuildFile; productRef = 77F0D4105983A0787AFCCF72 /* ZenithKit */; };
 		5955CB04C95B12A947221A5F /* RestoreDataAttachmentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */; };
@@ -64,7 +63,6 @@
 		2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletCore-MIT.txt"; sourceTree = "<group>"; };
 		3825917F2FA239089D3FE6EA /* ManualWorkServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualWorkServerView.swift; sourceTree = "<group>"; };
 		3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletPresentation-MIT.txt"; sourceTree = "<group>"; };
-		3E750ECFD3FF478351FC7691 /* Membership.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = Membership.json; sourceTree = "<group>"; };
 		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		496B9C1D5C3045A07F7F2E21 /* AppleDictationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleDictationDriver.swift; sourceTree = "<group>"; };
 		4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateNetworkView.swift; sourceTree = "<group>"; };
@@ -198,7 +196,6 @@
 				996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */,
 				E4D471A1EAA463D3861BCF7F /* Info.plist */,
 				3825917F2FA239089D3FE6EA /* ManualWorkServerView.swift */,
-				3E750ECFD3FF478351FC7691 /* Membership.json */,
 				FC8851A2C7F86B0043EA1D95 /* MembershipView.swift */,
 				B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */,
 				0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */,
@@ -286,7 +283,6 @@
 				C5A6A07B58B5CC71F0BBF6B8 /* Assets.xcassets in Resources */,
 				9F4B19BF8D20D0B07AB8C4BF /* CastaliaWalletCore-MIT.txt in Resources */,
 				DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */,
-				544C71C1A309B9ACFCCA4001 /* Membership.json in Resources */,
 				1670ECD86E55A71E82A90210 /* Tailscale-LICENSE.txt in Resources */,
 				FF439BAE64F19AFFE654BD25 /* Tailscale-dependencies.txt in Resources */,
 			);
