@@ -5,5 +5,5 @@ let package = Package(name: "ZenithKit", platforms: [.iOS(.v17), .macOS(.v13)], 
     .target(name: "ZenithKit", dependencies: ["CastaliaWallet"], linkerSettings: [.linkedLibrary("sqlite3")]),
     .executableTarget(name: "ZenithTransfer", dependencies: ["ZenithKit"], resources: [.copy("Resources")]),
     .testTarget(name: "ZenithKitTests", dependencies: ["ZenithKit"], resources: [.process("Fixtures")]),
-    .testTarget(name: "ZenithTransferTests", dependencies: ["ZenithTransfer", "ZenithKit"])
+    .testTarget(name: "ZenithTransferTests", dependencies: ["ZenithTransfer", "ZenithKit"], resources: [.copy("Fixtures")])
 ])

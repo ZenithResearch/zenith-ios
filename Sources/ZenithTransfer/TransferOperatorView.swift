@@ -4,75 +4,6 @@ import SwiftUI
 import WebKit
 import ZenithKit
 
-struct TransferOperatorView: View {
-  @StateObject private var bridge: TransferOperatorBridge
-  @ObservedObject private var walletModel: TransferModel
-  @State private var unlocking = false
-  @Environment(\.dismiss) private var dismiss
-  init(resource: RegisteredResource, repository: WalletRepository, walletModel: TransferModel) {
-    self.walletModel = walletModel
-    _bridge = StateObject(wrappedValue: TransferOperatorBridge(resource: resource, repository: repository))
-  }
-  var body: some View {
-    VStack(spacing: 0) {
-      HStack {
-        Text(bridge.resource.configuration.name).font(.headline)
-        Text(bridge.resource.id).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-        Spacer()
-        Button(walletModel.wallet?.unlocked == true ? "Wallet" : "Unlock Wallet") { unlocking = true }
-        Button("Close inbox") { bridge.cancel(); dismiss() }
-      }.padding(12)
-      HStack {
-        Text(walletModel.wallet?.unlocked == true
-          ? "Review and sign grant decisions with your Transfer Wallet."
-          : "Unlock your Transfer Wallet here to review requests and manage grants.")
-          .font(.callout).foregroundStyle(.secondary)
-        Spacer()
-      }.padding(.horizontal, 12).padding(.bottom, 10)
-      Divider()
-      if let error = bridge.failure { Text(error).padding(24) }
-      else { OperatorWebView(bridge: bridge) }
-    }.frame(minWidth: 900, minHeight: 650)
-      .sheet(isPresented: $unlocking) {
-        VStack(spacing: 0) {
-          HStack { Text("Castalia Wallet").font(.headline); Spacer(); Button("Return to inbox") { unlocking = false } }.padding()
-          Divider(); TransferWalletView(model: walletModel)
-        }.frame(width: 720, height: 660)
-      }
-      .sheet(item: $bridge.consent, onDismiss: { bridge.resolve(false) }) { consent in
-        VStack(alignment: .leading, spacing: 16) {
-          Text(bridge.confirmationTitle).font(.title2.bold())
-          Text("\(consent.receiver)\nIssuer: \(consent.issuer)").textSelection(.enabled)
-          Text("Review the exact signed action below. This approval expires at \(consent.expiresAt.formatted()).")
-          ScrollView {
-            Text(bridge.disclosure).font(.system(.body, design: .monospaced))
-              .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-          }
-          HStack {
-            Button("Cancel") { bridge.resolve(false) }
-            Spacer()
-            Button("Approve in Castalia Wallet") { bridge.resolve(true) }.buttonStyle(.borderedProminent)
-          }
-        }.padding(24).frame(width: 700, height: 580)
-      }
-      .onChange(of: walletModel.wallet?.unlocked) { unlocked in
-        bridge.walletStateDidChange(unlocked == true)
-      }
-      .onDisappear { bridge.cancel() }
-  }
-}
-
-private struct OperatorWebView: NSViewRepresentable {
-  @ObservedObject var bridge: TransferOperatorBridge
-  func makeNSView(context: Context) -> WKWebView {
-    bridge.makeWebView()
-  }
-  func updateNSView(_ nsView: WKWebView, context: Context) { }
-  static func dismantleNSView(_ nsView: WKWebView, coordinator: ()) {
-    nsView.stopLoading(); nsView.configuration.userContentController.removeScriptMessageHandler(forName: "operator", contentWorld: .page)
-  }
-}
-
 extension TransferOperatorBridge {
   func makeWebView() -> WKWebView {
     let config = WKWebViewConfiguration()
@@ -89,7 +20,7 @@ extension TransferOperatorBridge {
   }
 }
 
-/// Only signed application-bundled UI can call this bridge. Service responses
+/// Native SwiftUI and the bundled regression renderer share this boundary. Service responses
 /// remain data: no remote page, script, iframe or general signing API is loaded.
 @MainActor final class TransferOperatorBridge: NSObject, ObservableObject, WKURLSchemeHandler,
   WKNavigationDelegate, WKScriptMessageHandlerWithReply {
@@ -207,6 +138,14 @@ extension TransferOperatorBridge {
       }
     }
   }
+  // SwiftUI and the retained regression renderer share exactly the same guarded
+  // transport, native consent and durable dispatch boundary.
+  func invokeNative(_ method: String, _ args: [String: Any] = [:]) async throws -> Any {
+    guard !closed, ["identity", "save", "clear", "approve", "post"].contains(method) else { throw NativeGrantError.invalid }
+    let value = try await handle(method, args)
+    guard !closed else { throw CancellationError() }; return value
+  }
+  func retainedNativeAction() throws -> Data? { try journal?.load() }
   private func handle(_ method: String, _ args: [String: Any]) async throws -> Any {
     switch method {
     case "hash":

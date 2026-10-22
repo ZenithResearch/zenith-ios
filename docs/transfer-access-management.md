@@ -2,7 +2,7 @@
 
 Transfer is the operator application. Register a resource from its public HTTPS connection settings, open **Manage access in Transfer**, and unlock the app's Castalia Wallet in that screen. Review requests, choose a permission preset independently of its resource paths, review the exact selection, and approve its signed decision. Grant inspection and revocation use the same native flow. The resource must already admit that Wallet as an operator.
 
-The management UI is bundled with the signed application and rendered inside its WKWebView. It is not a remote monitor page. Its native bridge validates the selected resource, issuer, challenge, policy revision and exact action before presenting Castalia consent. Signing stays in the shared Wallet core; the key is not given to the renderer. Native HTTPS transport sends the approved proof to that resource's challenge/action endpoints. A durable action journal requires recovery of the original decision after an uncertain dispatch.
+Build16 renders the request inbox, credential editor, resource hierarchy and exact-selection review in SwiftUI. It is separate from owner setup and does not open a WKWebView or external monitor. The existing native boundary validates the selected resource, issuer, challenge, policy revision and exact action before presenting Castalia consent. Signing stays in the shared Wallet core; the editor receives no private key. Native HTTPS transport sends the approved proof to that resource's challenge/action endpoints. A durable action journal requires recovery of the original decision after an uncertain dispatch.
 
 Each resource owns its operator policy and activates its grants. DevGraph's current operator interface uses Wallet public keys for admission, its own access policy/inbox, and the existing secS-backed credential path. A separate central authentication/settings server is not required for this implementation. Other resource types need an explicit compatible management contract; a registered port alone does not make a service administrable.
 
@@ -50,7 +50,44 @@ new runtime Work kinds, storage migrations or implicit credentials.
 Owner setup v2 makes granular read operations explicit and snapshots the recipe.
 The v1 parser/digests stay compatible. Custom recipes remain local until a future
 reviewed server catalog publication. Saving a recipe or owner plan creates no
-member grants and does not activate the production owner. The existing signed
-operator execution is still the bundled native-transport/WKWebView flow; replacing
-its grant selection screen with the Swift editor and connecting production owner
-installation are tracked next steps, not completed by this UI build.
+member grants and does not activate the production owner. Build16 also uses the recipes in its native per-request credential editor. Production
+owner installation remains a separate unfinished gate.
+
+## Native per-request credential editor (build16)
+
+Open a saved HTTPS resource → **Manage access in Transfer** → **Review inbox in
+Wallet**. Select a request and choose a server preset, local recipe or custom
+permissions. Permission presets select actions; they do not select an Arena or
+expand the resource scope. Unavailable recipe actions are removed with a visible
+notice. Local recipes are not silently published to the server catalog.
+
+Choose one or more named Arena/Initiative/Project branches in the hierarchy, or
+explicitly choose all resources permitted by the server. Selecting a container
+includes matching descendants at the time of access; moving out removes access.
+A selected parent visually includes its children. Empty selection, missing
+hierarchy data or an out-of-policy path never falls back to global access. The
+exact review retains each server rule’s correlated kind, object, Arena and path
+restrictions. Creating unattached Work is unavailable for a path grant.
+
+Choose until-revoked validity when allowed, or a dated expiry within policy.
+Review the exact read/write snapshot, then separately confirm activation in
+Castalia. Read remains installation-bound; writes follow the Wallet across
+admitted installations. Changing read alone preserves any existing write grant,
+and vice versa. No separate delegation ceiling is configured here.
+
+**Onward delegation is not allowed.** Current grants cannot issue child
+credentials; there is no enable switch. Future authority/delegation fields and
+unsupported operations fail closed rather than being cloned into a credential.
+Seat metadata remains descriptive and does not confer permissions.
+
+Lock, closure or lost responses preserve the original action journal. Recover
+its status before preparing another decision. The Swift editor uses the existing
+versioned challenge/action contracts; older pending records and the retained
+bundled-renderer regression path remain compatible.
+
+Validation: native selection vectors match the established JavaScript producer
+and are accepted by DevGraph’s standing-grant receiver decoder. Disposable
+Wallet/fake-server tests cover inbox → review → activation, retained-journal
+lock/relaunch and status-only recovery without replay, concurrent preparation,
+and tampered challenges. Installed UI and production activation are distinct
+qualification gates; source tests do not establish production access.
