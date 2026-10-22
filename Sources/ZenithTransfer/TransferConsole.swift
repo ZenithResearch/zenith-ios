@@ -216,7 +216,7 @@ private struct TransferResourcesView: View {
               Text("A selected container includes the resources beneath it at the time of access. Global access remains limited by the server's operator policy.")
                 .foregroundStyle(.secondary)
               Button("Manage access in Transfer") { operatorResource = current }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(TransferPrimaryButtonStyle())
                 .disabled(model.repository == nil)
               if model.wallet?.unlocked != true {
                 Text("You can unlock your Wallet inside access management. Set up your Wallet first if you haven’t imported one yet.").foregroundStyle(.secondary)
@@ -242,13 +242,13 @@ private struct TransferResourcesView: View {
               if let configuration = local.connection {
                 Button("Review connection") { do { propose(try RegisteredResource(configuration: configuration)) }
                   catch { model.error = "This service needs valid public connection settings." } }
-                  .buttonStyle(.borderedProminent)
+                  .buttonStyle(TransferPrimaryButtonStyle())
                 connection(configuration)
               } else {
                 Text("Wallet connection setup needed").font(.headline)
                 Text("Choose the owner Wallet, permissions, resource paths and HTTPS connection here. Review the setup before installing any authority on this graph.")
                   .foregroundStyle(.secondary)
-                Button("Set up owner & access") { ownerResource = local }.buttonStyle(.borderedProminent)
+                Button("Set up owner & access") { ownerResource = local }.buttonStyle(TransferPrimaryButtonStyle())
                 Button("Import an existing Wallet connection") { importProfile() }
               }
               Text("Registration does not grant operator access or change certificate trust. The server checks your Wallet when you review requests.")
@@ -292,7 +292,7 @@ private struct TransferResourcesView: View {
             Button("Register resource") {
               model.register(value, replacing: replacing)
               selected = value.id; proposed = nil
-            }.buttonStyle(.borderedProminent)
+            }.buttonStyle(TransferPrimaryButtonStyle())
           }
         }.padding(24).frame(width: 600, height: 500)
       }

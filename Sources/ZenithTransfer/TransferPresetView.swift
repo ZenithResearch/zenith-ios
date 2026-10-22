@@ -64,7 +64,7 @@ struct TransferPresetsView: View {
           Text("Reusable permission recipes. Choose resources and duration when you set up access.").foregroundStyle(.secondary)
         }
         Spacer()
-        Button("New preset") { editing = PresetEditTarget(source: nil, duplicate: false) }.buttonStyle(.borderedProminent)
+        Button("New preset") { editing = PresetEditTarget(source: nil, duplicate: false) }.buttonStyle(TransferPrimaryButtonStyle())
       }
       Text("Changing a recipe saves a new revision. It does not change existing credentials, grants or owner policies.").font(.callout)
       Toggle("Show archived presets", isOn: $showArchived)
@@ -130,7 +130,7 @@ struct TransferPresetEditor: View {
             HStack {
               Button("Back to edit") { self.review = nil }
               Spacer()
-              Button("Save preset revision") { save(review) }.buttonStyle(.borderedProminent)
+              Button("Save preset revision") { save(review) }.buttonStyle(TransferPrimaryButtonStyle())
             }
           } else {
             TextField("Preset name", text: $name)
@@ -165,7 +165,7 @@ struct TransferPresetEditor: View {
             }
             if source != nil && !duplicate { Toggle("Archive this preset for new selections", isOn: $archived) }
             Text("A preset contains permissions only. Holder Wallet, resource paths, expiry and the operator’s approval are chosen separately.").foregroundStyle(.secondary)
-            Button("Review preset") { prepare() }.buttonStyle(.borderedProminent)
+            Button("Review preset") { prepare() }.buttonStyle(TransferPrimaryButtonStyle())
           }
           if let error { Text(error).foregroundStyle(.red) }
         }.padding(24)

@@ -141,7 +141,7 @@ struct TransferOwnerSetupView: View {
               Button("Edit settings") { setup.review = nil }
               Spacer()
               Button("Save setup plan") { Task { await setup.save(repository: walletModel.repository) } }
-                .buttonStyle(.borderedProminent).disabled(walletModel.wallet?.unlocked != true)
+                .buttonStyle(TransferPrimaryButtonStyle()).disabled(walletModel.wallet?.unlocked != true)
             }
           } else {
             section("1. Your graph and owner Wallet") {
@@ -154,7 +154,7 @@ struct TransferOwnerSetupView: View {
               Text(walletModel.wallet?.unlocked == true ? "Use this Wallet to administer access after the setup is approved." : "Unlock your Transfer Wallet here to bind the reviewed setup to its identity.").foregroundStyle(.secondary)
               Text("Owner administration manages member grants. It does not automatically give this Wallet permission to edit Work.").font(.callout)
             }
-            section("2. Permissions the owner may grant") {
+            section("2. Permissions this Wallet may delegate") {
               HStack {
                 Picker("Permission recipe", selection: Binding(get: { setup.recipe?.id ?? "custom" }, set: { id in
                   if let value = library.available.first(where: { $0.id == id }) { setup.apply(value) }
@@ -210,7 +210,7 @@ struct TransferOwnerSetupView: View {
           Spacer()
           Text("No authority changes until activation").font(.caption).foregroundStyle(.secondary)
           Button("Review owner setup") { setup.prepare(wallet: walletModel.wallet) }
-            .buttonStyle(.borderedProminent).disabled(setup.inspection == nil || setup.scope == "unselected")
+            .buttonStyle(TransferPrimaryButtonStyle()).disabled(setup.inspection == nil || setup.scope == "unselected")
         }.padding(16)
       }
     }.frame(minWidth: 900, minHeight: 700)
