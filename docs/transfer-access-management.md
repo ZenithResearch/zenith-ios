@@ -1,5 +1,9 @@
 # Access management in Transfer
 
+The current delivery sequence and production acceptance gates are maintained in
+[Transfer credential-setting completion plan](transfer-credential-completion-plan.md).
+Build16 is the native editor milestone; production activation is still unfinished.
+
 Transfer is the operator application. Register a resource from its public HTTPS connection settings, open **Manage access in Transfer**, and unlock the app's Castalia Wallet in that screen. Review requests, choose a permission preset independently of its resource paths, review the exact selection, and approve its signed decision. Grant inspection and revocation use the same native flow. The resource must already admit that Wallet as an operator.
 
 Build16 renders the request inbox, credential editor, resource hierarchy and exact-selection review in SwiftUI. It is separate from owner setup and does not open a WKWebView or external monitor. The existing native boundary validates the selected resource, issuer, challenge, policy revision and exact action before presenting Castalia consent. Signing stays in the shared Wallet core; the editor receives no private key. Native HTTPS transport sends the approved proof to that resource's challenge/action endpoints. A durable action journal requires recovery of the original decision after an uncertain dispatch.
