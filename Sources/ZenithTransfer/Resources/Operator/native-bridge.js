@@ -22,6 +22,35 @@
     await writes;
     return JSON.parse(await call('approve', {challenge:JSON.stringify(challenge)}));
   }};
+  const mounts = new Set();
+  let identityGeneration = 0;
+  const changed = message => {
+    for (const {element, onChange} of mounts) {
+      element.textContent = message;
+      onChange();
+    }
+  };
+  const refreshIdentity = async () => {
+    const generation = ++identityGeneration;
+    try {
+      const identity = JSON.parse(await call('identity'));
+      if (generation !== identityGeneration) return;
+      wallet.requestIdentity = identity;
+      changed('');
+    } catch {
+      if (generation !== identityGeneration) return;
+      wallet.requestIdentity = null;
+      changed('Use Wallet above to unlock or check your operator Wallet.');
+    }
+  };
+  globalThis.addEventListener('zenith-operator-wallet-state', event => {
+    if (event.detail?.unlocked === true) void refreshIdentity();
+    else {
+      ++identityGeneration;
+      wallet.requestIdentity = null;
+      changed('Use Unlock Wallet above to continue.');
+    }
+  });
   globalThis.ZenithOperator = {origin:config.origin, storage, call,
     async fetch(path, options) {
       await writes;
@@ -31,8 +60,8 @@
     }
   };
   globalThis.DevgraphWalletAccess = {mount(element, {onChange}) {
-    call('identity').then(text => {wallet.requestIdentity=JSON.parse(text);onChange();})
-      .catch(() => {element.textContent='Unlock the Transfer Wallet, then reopen this inbox.';});
+    mounts.add({element, onChange});
+    void refreshIdentity();
     return wallet;
   }};
 })();

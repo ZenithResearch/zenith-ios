@@ -12,6 +12,7 @@ import ZenithKit
   @Published var error: String?
   @Published var busy = false
   let fileCatalog = TransferFileCatalog()
+  let presetLibrary = TransferPresetLibrary()
   let repository: WalletRepository?
   private let registry: ResourceRegistry?
   private var unlockedAt: Date?
@@ -100,6 +101,7 @@ struct TransferConsole: View {
       VStack(alignment: .leading, spacing: 16) {
         Text("Zenith Transfer").font(.title2.bold()).padding(.bottom, 12)
         nav("Resources & requests", "square.stack.3d.up", "resources")
+        nav("Credential presets", "slider.horizontal.3", "presets")
         nav("Wallet", "wallet.pass", "wallet")
         nav("Transfer files", "qrcode", "files")
         Spacer()
@@ -111,6 +113,7 @@ struct TransferConsole: View {
       Divider()
       Group {
         switch section {
+        case "presets": TransferPresetsView(library: model.presetLibrary)
         case "wallet": TransferWalletView(model: model)
         case "files": TransferWindow(catalogModel: model.fileCatalog)
         default: TransferResourcesView(model: model)
@@ -143,6 +146,7 @@ private struct TransferResourcesView: View {
   @State private var replacing: RegisteredResource?
   @State private var removing: RegisteredResource?
   @State private var operatorResource: RegisteredResource?
+  @State private var ownerResource: LocalResource?
   @State private var address = ""
   private var current: RegisteredResource? { model.resources.first { $0.id == selected } }
   private var currentLocal: LocalResource? { model.localResources.first { $0.id == selected } }
@@ -207,25 +211,18 @@ private struct TransferResourcesView: View {
           if let current {
             VStack(alignment: .leading, spacing: 16) {
               Text(current.configuration.name).font(.title.bold())
-              Label("DevGraph · operator inbox", systemImage: "tray.full")
-              Text("Review incoming requests, select a permission preset and one or more resource paths, then approve the exact grant in your Castalia Wallet.")
+              Label("DevGraph · access management", systemImage: "person.badge.key")
+              Text("Review requests, choose permissions and resource paths, then approve grants with your Transfer Wallet.")
               Text("A selected container includes the resources beneath it at the time of access. Global access remains limited by the server's operator policy.")
                 .foregroundStyle(.secondary)
-              Button("Review requests & grants in Transfer") { operatorResource = current }
+              Button("Manage access in Transfer") { operatorResource = current }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.wallet?.canRequestWorkAccess != true || model.wallet?.operatorAccessProtocol != "castalia.operator-access.v1")
+                .disabled(model.repository == nil)
               if model.wallet?.unlocked != true {
-                Text("Set up or unlock the Castalia Wallet in the Wallet tab to review requests here.").foregroundStyle(.secondary)
+                Text("You can unlock your Wallet inside access management. Set up your Wallet first if you haven’t imported one yet.").foregroundStyle(.secondary)
               }
-              Button("Open requests & grants in browser") {
-                if !NSWorkspace.shared.open(current.inboxURL) { model.error = "Could not open your browser." }
-              }
-              Text("Uses the Wallet in your browser. This Transfer Wallet is separate. The server must already authorize that Wallet as an operator.")
+              Text("Only a Wallet authorized by this service can manage its grants. Transfer signs your reviewed decisions and sends them directly to this server.")
                 .font(.callout).foregroundStyle(.secondary)
-              Button("Copy inbox address") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(current.inboxURL.absoluteString, forType: .string)
-              }
               DisclosureGroup("Connection and issuer") { connection(current.configuration) }
               Text("Existing grants can be inspected and revoked in the inbox. Changing an existing grant without a new member request is still planned.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -249,9 +246,10 @@ private struct TransferResourcesView: View {
                 connection(configuration)
               } else {
                 Text("Wallet connection setup needed").font(.headline)
-                Text("This DevGraph advertises its local monitor, but has not published HTTPS Wallet issuer settings. Configure its Wallet access endpoint, then publish its public connection file. No local bearer or signing key is imported here.")
+                Text("Choose the owner Wallet, permissions, resource paths and HTTPS connection here. Review the setup before installing any authority on this graph.")
                   .foregroundStyle(.secondary)
-                Button("Open local monitor") { NSWorkspace.shared.open(local.monitorURL) }
+                Button("Set up owner & access") { ownerResource = local }.buttonStyle(.borderedProminent)
+                Button("Import an existing Wallet connection") { importProfile() }
               }
               Text("Registration does not grant operator access or change certificate trust. The server checks your Wallet when you review requests.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -262,20 +260,23 @@ private struct TransferResourcesView: View {
               Text("Choose a service discovered on this Mac, import a public connection file, or look up an HTTPS DevGraph address. Review its public settings before saving a connection.")
               Text("DevGraph is the first supported resource. A port or a running Hub service alone does not establish ownership or provide a credential-management interface.")
                 .foregroundStyle(.secondary)
-              Text("Unlock your Castalia Wallet to review DevGraph requests here, or use your browser Wallet. Other service types need a compatible management interface.")
+              Text("Use your Transfer Wallet to manage requests and grants for a registered service. Each service checks its own operator permissions.")
                 .font(.callout).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
           }
         }
       }.frame(maxHeight: .infinity)
     }.padding(24)
+      .onChange(of: model.localResources) { resources in if selected == nil { selected = resources.first?.id } }
+      .onAppear { if selected == nil { selected = model.localResources.first?.id } }
+      .sheet(item: $ownerResource) { value in TransferOwnerSetupView(resource: value, walletModel: model) }
       .sheet(item: $operatorResource) { value in
         if let repository = model.repository { TransferOperatorView(resource: value, repository: repository, walletModel: model) }
       }
       .sheet(item: $proposed) { value in
         VStack(alignment: .leading, spacing: 16) {
           Text("Register this resource?").font(.title2.bold())
-          Text("Confirm these public settings against your server administrator's information. This does not grant authority or add certificate trust to your browser.")
+          Text("Confirm these public settings against your server administrator's information. Registration saves the connection; the server still checks your Wallet’s authority.")
           ScrollView {
             if let replacing {
               Text("Replace saved connection settings").font(.headline)
@@ -312,7 +313,7 @@ private struct TransferResourcesView: View {
       Text("Network: \(config.network?.rawValue ?? "HTTPS")")
       if let fingerprint = config.tls_certificate_sha256 {
         Text("Certificate SHA-256: \(fingerprint)").font(.caption.monospaced())
-        Text("This pin is for the native connection. Your browser separately validates HTTPS; registration does not install this certificate.")
+        Text("This certificate pin applies only to this saved Transfer connection.")
           .font(.caption).foregroundStyle(.secondary)
       }
     }.textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)

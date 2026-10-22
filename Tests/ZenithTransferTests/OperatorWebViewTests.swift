@@ -36,6 +36,7 @@ final class OperatorWebViewTests: XCTestCase {
     _=try await repo.create(password:"disposable web test password")
     let backup=try await repo.exportRecovery(password:"disposable backup password")
     _=try await repo.verifyBackup(file:backup,password:"disposable backup password")
+    _=await repo.lock()
     let config=try WorkAccessConfiguration(name:"Fixture",receiver:URL(string:"https://fixture.example")!,issuer:"fixture",keyID:"key",publicKey:String(repeating:"12",count:32))
     var actions=0, grantDecisions=0, tamperOperation=false
     var originalResult: [String:Any]?
@@ -74,7 +75,11 @@ final class OperatorWebViewTests: XCTestCase {
       XCTFail("Timed out: \(expression): \(text); \(view.url?.absoluteString ?? "no URL"); \(bridge.failure ?? "no navigation error")")
       throw NSError(domain:"OperatorWebViewTests",code:1)
     }
-    try await waitFor("!!document.getElementById('refresh')?.onclick && !document.getElementById('refresh').disabled")
+    try await waitFor("!!document.getElementById('refresh')?.onclick && document.getElementById('refresh').disabled && document.getElementById('wallet-read-connection').textContent.includes('Use Wallet')")
+    XCTAssertEqual(actions,0,"A locked manager cannot submit an operator action")
+    _=try await repo.unlock(password:"disposable web test password")
+    bridge.walletStateDidChange(true)
+    try await waitFor("!document.getElementById('refresh').disabled")
     _=try await view.evaluateJavaScript("document.getElementById('refresh').click()")
     try await waitFor("!document.getElementById('confirm').hidden")
     _=try await view.evaluateJavaScript("document.getElementById('confirm').click()")
@@ -115,6 +120,16 @@ final class OperatorWebViewTests: XCTestCase {
     XCTAssertEqual(grantDecisions,1)
     let retained=try XCTUnwrap(OperatorJournal(directory:journalRoot,origin:config.origin).load())
     XCTAssertFalse(String(decoding:retained,as:UTF8.self).contains("signature"))
+    _=await repo.lock()
+    bridge.walletStateDidChange(false)
+    try await waitFor("document.getElementById('recover').disabled")
+    XCTAssertEqual(try OperatorJournal(directory:journalRoot,origin:config.origin).load(),retained)
+    _=try await repo.unlock(password:"disposable web test password")
+    bridge.walletStateDidChange(true)
+    try await waitFor("!document.getElementById('recover').disabled")
+    XCTAssertEqual(try OperatorJournal(directory:journalRoot,origin:config.origin).load(),retained,
+      "Unlock refresh must preserve the original uncertain action without dispatch")
+    XCTAssertEqual(grantDecisions,1)
     bridge.cancel();view.stopLoading();view.configuration.userContentController.removeScriptMessageHandler(forName:"operator",contentWorld:.page)
     bridge=TransferOperatorBridge(resource:try RegisteredResource(configuration:config),repository:repo,transport:PrivateTransport(configuration:session),journalDirectory:journalRoot)
     view=bridge.makeWebView()

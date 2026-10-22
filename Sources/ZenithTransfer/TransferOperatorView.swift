@@ -22,6 +22,13 @@ struct TransferOperatorView: View {
         Button(walletModel.wallet?.unlocked == true ? "Wallet" : "Unlock Wallet") { unlocking = true }
         Button("Close inbox") { bridge.cancel(); dismiss() }
       }.padding(12)
+      HStack {
+        Text(walletModel.wallet?.unlocked == true
+          ? "Review and sign grant decisions with your Transfer Wallet."
+          : "Unlock your Transfer Wallet here to review requests and manage grants.")
+          .font(.callout).foregroundStyle(.secondary)
+        Spacer()
+      }.padding(.horizontal, 12).padding(.bottom, 10)
       Divider()
       if let error = bridge.failure { Text(error).padding(24) }
       else { OperatorWebView(bridge: bridge) }
@@ -47,6 +54,9 @@ struct TransferOperatorView: View {
             Button("Approve in Castalia Wallet") { bridge.resolve(true) }.buttonStyle(.borderedProminent)
           }
         }.padding(24).frame(width: 700, height: 580)
+      }
+      .onChange(of: walletModel.wallet?.unlocked) { unlocked in
+        bridge.walletStateDidChange(unlocked == true)
       }
       .onDisappear { bridge.cancel() }
   }
@@ -148,6 +158,13 @@ extension TransferOperatorBridge {
     let next = continuation; continuation = nil; consent = nil; next?.resume(returning: approved)
   }
   func cancel() { closed = true; resolve(false); transport?.cancel(); signed = nil }
+  func walletStateDidChange(_ unlocked: Bool) {
+    guard !closed, let webView else { return }
+    // This notification carries no identity or key. The renderer must ask the
+    // core again, which still enforces custody and original-journal identity.
+    let value = unlocked ? "true" : "false"
+    webView.evaluateJavaScript("globalThis.dispatchEvent(new CustomEvent('zenith-operator-wallet-state', {detail:{unlocked:\(value)}}))", completionHandler: nil)
+  }
   private func canonical(_ object: Any) throws -> Data {
     try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys,.withoutEscapingSlashes,.fragmentsAllowed])
   }

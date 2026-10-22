@@ -161,3 +161,18 @@ covers current/future descendants at access time; moving work out removes that
 coverage. The UI normalizes redundant child roots and limits independent roots to
 16. Existing v2 requests, original IDs and signed bytes are unchanged. Installing
 this picker does not activate or expand a grant.
+
+### Transfer access management
+
+The Mac companion manages registered resources directly using its own Castalia
+Wallet. **Manage access in Transfer** opens the bundled request and grant editor,
+including Wallet unlock and native approval of each exact decision. It does not
+launch an external browser. Each resource admits its own operator keys and enforces
+its own policy. See [Transfer access management](docs/transfer-access-management.md)
+for the signing boundary and installed qualification status.
+
+The native **Credential presets** library creates versioned permission recipes and
+shared Seat-type references. **Set up owner & access** on the local DevGraph
+selects those permissions separately from global or inherited container paths and
+validity. Build14 saves reviewed plans; production owner installation is still
+pending and is never implied by a saved recipe.
