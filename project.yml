@@ -23,6 +23,8 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        NSMicrophoneUsageDescription: Dictate a Chat message using your iPhone microphone. Review the text before sending.
+        NSSpeechRecognitionUsageDescription: Turn your spoken words into editable Chat text using on-device speech recognition.
         NSFaceIDUsageDescription: Unlock your Zenith wallet using Face ID instead of typing its password.
         NSLocalNetworkUsageDescription: Connect to your chosen work server on the same Wi-Fi network.
         NSCameraUsageDescription: Scan an encrypted recovery file from your laptop screen to import your wallet offline.
@@ -34,7 +36,7 @@ targets:
               public.filename-extension: [castalia-recovery]
     sources:
       - path: App
-        excludes: [WorkAccess.json]
+        excludes: [WorkAccess.json, Membership.json]
     dependencies:
       - package: ZenithKit
       - framework: Artifacts/TailscaleKit.xcframework
@@ -49,8 +51,9 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: '1,2'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '13'
+        CURRENT_PROJECT_VERSION: '33'
 schemes:
   Zenith:
     build:

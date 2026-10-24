@@ -48,16 +48,7 @@ struct WalletPasswordField: View {
   @Binding var text: String
   var isNew = false
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Text(title).font(.subheadline.weight(.semibold))
-      SecureField(title, text: $text, prompt: Text(prompt))
-        .textContentType(isNew ? .newPassword : .password)
-        .textInputAutocapitalization(.never).autocorrectionDisabled()
-        .padding(16).frame(minHeight: 54)
-        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(uiColor: .separator), lineWidth: 0.5))
-        .accessibilityLabel(title)
-    }
+    WalletPasswordEntry(title: title, text: $text, isNew: isNew).accessibilityHint(prompt)
   }
 }
 

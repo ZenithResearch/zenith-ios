@@ -9,7 +9,7 @@ Updated October 13, 2026. Published native preview source. Generic server setup 
 - Offline QR transfer carries the encrypted file itself; the Mac companion and USB/Files routes feed the same validated import flow. Existing wallets cannot be replaced.
 - `Dependencies.json` pins Wallet `f654017`. The builder checks the revision and relevant source cleanliness. Work server address and issuer pins are supplied and approved locally. No Work deployment configuration is bundled.
 - Devgraph issues a signed read credential under explicit operator policy. secS verifies issuer signature, holder proof, expiry, exact operation, and current registry status. Devgraph consumes replay nonces and applies resource/Arena restrictions before pagination.
-- Read permissions cover the five concrete Work types: Proposal, Initiative, Project, Issue, and Task. Base Todo and canonical progress are not exposed by the existing delegated projection; absent progress is shown as “Progress not recorded.”
+- Legacy connections retain the five-type reader. The October 17 adapter also accepts explicitly versioned monitor scopes for Todo, canonical progress and permitted relationships; missing progress remains “Progress not recorded.”
 
 ## Evidence
 
@@ -44,3 +44,33 @@ Work connection now offers Direct or Private via Tailscale. The private route us
 Validated public profiles in Zenith’s Documents folder appear as a Connect button. In-app instructions cover missing files, network login, and separate read approval. Optional Face ID/Touch ID saves the verified wallet password in a device-only, current-biometric-set Keychain item. The shared Rust custody and signing contracts remain unchanged; Swift adds lifecycle and identity checks around unlocking. Password AutoFill and ordinary password unlock remain available.
 
 43 Swift tests pass, including six added discovery/biometric-coordination tests. The real Keychain adapter builds in the signed iPhone app; synthetic storage tests are not qualification of physical Face ID. First device enrollment/unlock, biometric changes/lockout, and the end-to-end private read remain outstanding until exercised on-device.
+
+## Monitor read compatibility — October 17, 2026
+
+PR #1 is merged. The follow-up native reader accepts the explicitly versioned v2 and v3 scope/result pairs. Modern connections use the monitor read endpoint for Todos, canonical progress, revision-bound pages, detail reads and permitted relationships. Older saved five-type connections retain their original transport. The consent screen shows operations and relationship types, in addition to resource/Arena scope and expiry.
+
+Wallet source pin, native ABI, recovery files, encrypted snapshot schema and issuer trust remain unchanged. New tests cross the actual native Rust approval/storage/signing boundary with disposable issuers and a stub HTTP receiver; Python-generated fixtures pin the real public Devgraph response shapes. No live receiver, credential, grant or phone installation changed. Physical-device acceptance and the native request/status flow for the newer shared approval inbox remain outstanding. See READ-COMPATIBILITY.md for exact coverage and limits.
+
+## Hermes Chat — build 15, October 17, 2026
+
+Adds a native Chat tab, a generic HTTPS gateway connection importer, device-only Keychain authorization, normal Hermes Sessions API calls and recovery of server history after unlock. Private routing reuses the embedded Tailscale session; an interrupted send is never retried automatically. Work/custody/recovery contracts remain unchanged.
+
+The actual Swift client passed an authenticated chat and history reload through the dedicated tailnet HTTPS gateway. The combined suite ran 57 tests with one optional LAN probe skipped and no failures, including the explicit live Swift chat test. Repeated conversation creation no longer supplies a conflicting fixed title. Simulator compilation and a signed iPhone build passed. Phone installation and physical connection/import/background/accessibility checks are recorded separately; no phone result is inferred from the Mac test. Streaming, voice, attachments and tool-approval screens are deferred. See HERMES-CHAT.md.
+
+## Tailscale auth-key enrollment — build 16, October 17, 2026
+
+The shared private connection setup supports explicit auth-key entry and bounded plain-text file import. Enrollment uses the pinned TailscaleKit configuration authKey option and retains non-ephemeral, protected installation-local node state. Input clears on submission/inactivity/dismissal; the native runtime holds the supplied key only during that node lifetime. Reconnect/resume uses saved identity without replaying the key. Key enrollment suppresses browser sign-in fallback and reports generic failures without upstream error text. Browser sign-in and existing Work/Hermes settings remain compatible. A valid operator key is required for live acceptance.
+
+## Chat dictation — build 17, October 17, 2026
+
+Prepared a microphone composer action using Apple Speech/AVAudioEngine with required on-device recognition and explicit permission prompts. The transcript joins the current draft, stays editable after Stop, and is sent only through the existing explicit Send action. Capture is bounded to 55 seconds, finalization to three seconds, and stale callbacks are rejected after stopping/cancelling/clearing. No audio uploads, audio files or background recording are introduced. The iOS 18.1 deployment minimum and text-only gateway protocol remain compatible. Physical-device dictation, denial, audio interruptions, locales and accessibility remain acceptance checks.
+
+## Remote Work access — build 18, October 19, 2026
+
+Adds public HTTPS server discovery with explicit verification review, native
+access-request/status consent and durable public request IDs for unknown-outcome
+recovery. Existing LAN/Tailscale and native-v2/monitor-v3 readers remain supported.
+The shared native core is pinned to d89580e; this adds neither arbitrary signing
+nor native Work mutations. The 71-test native suite passed with 2 optional skips,
+and full Simulator/signed-device builds passed. Remote phone acceptance remains
+separate. See REMOTE-ACCESS.md for the exact boundary and pending device checks.

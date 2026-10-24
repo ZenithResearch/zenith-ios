@@ -22,6 +22,28 @@ import XCTest
 }
 
 @MainActor final class BiometricUnlockTests: XCTestCase {
+  func testAutomaticTouchIDWaitsForReadyEnrolledIPadAndPromptsOnlyOnce() {
+    var policy = AutomaticBiometricUnlock()
+    XCTAssertFalse(policy.claim(isPad: true, touchID: true, enabled: false, ready: true))
+    XCTAssertFalse(policy.claim(isPad: true, touchID: true, enabled: true, ready: false))
+    XCTAssertTrue(policy.claim(isPad: true, touchID: true, enabled: true, ready: true))
+    // A cancelled/failed prompt or a foreground cycle cannot prompt again.
+    XCTAssertFalse(policy.claim(isPad: true, touchID: true, enabled: true, ready: false))
+    XCTAssertFalse(policy.claim(isPad: true, touchID: true, enabled: true, ready: true))
+  }
+  func testIPhoneAndFaceIDKeepExplicitUnlock() {
+    var policy = AutomaticBiometricUnlock()
+    XCTAssertFalse(policy.claim(isPad: false, touchID: true, enabled: true, ready: true))
+    XCTAssertFalse(policy.claim(isPad: false, touchID: false, enabled: true, ready: true))
+    XCTAssertFalse(policy.claim(isPad: true, touchID: false, enabled: true, ready: true))
+  }
+  func testManualLockSuppressesAutomaticPromptUntilNewProcess() {
+    var policy = AutomaticBiometricUnlock()
+    policy.suppress()
+    XCTAssertFalse(policy.claim(isPad: true, touchID: true, enabled: true, ready: true))
+    var freshLaunch = AutomaticBiometricUnlock()
+    XCTAssertTrue(freshLaunch.claim(isPad: true, touchID: true, enabled: true, ready: true))
+  }
   private let password = "disposable biometric test password"
   private func wallet() throws -> (WalletRepository, URL) {
     let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

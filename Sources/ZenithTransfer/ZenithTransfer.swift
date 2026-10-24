@@ -6,18 +6,21 @@ import UniformTypeIdentifiers
 import ZenithKit
 
 @main
+@MainActor
 struct ZenithTransferApp: App {
+  @StateObject private var model=TransferModel()
   var body: some Scene {
     WindowGroup("Zenith Transfer") {
-      TransferWindow().frame(minWidth: 820, minHeight: 640)
+      TransferConsole(model:model).frame(minWidth: 920, minHeight: 680)
     }.defaultSize(width: 980, height: 780)
   }
 }
 
-private struct TransferWindow: View {
+struct TransferWindow: View {
   @State private var choosing = false
-  @State private var sections: [RecoveryCatalogSection] = []
-  @State private var loading = false
+  @ObservedObject var catalogModel: TransferFileCatalog
+  private var sections: [RecoveryCatalogSection] { catalogModel.sections }
+  private var loading: Bool { catalogModel.loading }
   @State private var selected: RecoveryCatalogFile?
   @State private var frames: [String] = []
   @State private var index = 0
@@ -25,11 +28,7 @@ private struct TransferWindow: View {
   @State private var error: String?
   @State private var playing = true
   private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-  private var files: [RecoveryCatalogFile] {
-    sections.flatMap(\.files).sorted {
-      $0.modified == $1.modified ? $0.url.path < $1.url.path : $0.modified > $1.modified
-    }
-  }
+  private var files: [RecoveryCatalogFile] { catalogModel.files }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -50,7 +49,7 @@ private struct TransferWindow: View {
         .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       if let error { Text(error).foregroundStyle(.red) }
     }.padding(24)
-      .task { await refresh() }
+      .task { if !catalogModel.loaded { await refresh() } }
       .fileImporter(isPresented: $choosing, allowedContentTypes: [.data, .json, .item]) { result in
         do { select(RecoveryFileCatalog.inspect(try result.get())) }
         catch { if (error as NSError).code != NSUserCancelledError { errorMessage("The file could not be opened.") } }
@@ -186,17 +185,14 @@ private struct TransferWindow: View {
     }
   }
   private func refresh() async {
-    guard !loading else { return }
-    loading = true
-    let folders = RecoveryFileCatalog.defaultFolders()
-    sections = await Task.detached { RecoveryFileCatalog.scan(folders) }.value
+    await catalogModel.refresh()
     selected = nil
     clearQR()
-    loading = false
   }
   private func select(_ file: RecoveryCatalogFile) {
     clearQR()
     selected = RecoveryFileCatalog.inspect(file.url)
+    if let selected { catalogModel.remember(selected) }
     guard let current = selected, current.canShowQR else { return }
     do {
       let data = try EncryptedImportFile.read(current.url)

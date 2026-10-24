@@ -14,14 +14,17 @@ fi
 git -C "$wallet_source" diff --exit-code HEAD -- Cargo.toml Cargo.lock crates/castalia-wallet-core crates/castalia-wallet-native crates/castalia-wallet-presentation contracts/portable-web >/dev/null || {
   echo "Wallet build inputs differ from the pinned commit" >&2; exit 2;
 }
+# Cargo may place scratch output outside the source checkout (for example when
+# the source volume is full). Use Cargo's resolved directory for packaging too.
+wallet_target_dir=$(cargo metadata --manifest-path "$wallet_source/Cargo.toml" --no-deps --format-version 1 --locked --offline | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
 for target in aarch64-apple-darwin aarch64-apple-ios-sim aarch64-apple-ios; do
   cargo build --manifest-path "$wallet_source/Cargo.toml" --locked --offline --release --target "$target" -p castalia-wallet-native
 done
 output="$app_root/Artifacts/CastaliaWallet.xcframework"
 if [ -d "$output" ]; then mv "$output" "$app_root/Artifacts/CastaliaWallet.previous.$(date +%s).xcframework"; fi
 xcodebuild -create-xcframework \
-  -library "$wallet_source/target/aarch64-apple-darwin/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
-  -library "$wallet_source/target/aarch64-apple-ios-sim/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
-  -library "$wallet_source/target/aarch64-apple-ios/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
+  -library "$wallet_target_dir/aarch64-apple-darwin/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
+  -library "$wallet_target_dir/aarch64-apple-ios-sim/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
+  -library "$wallet_target_dir/aarch64-apple-ios/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
   -output "$output"
 python3 "$app_root/scripts/core-manifest.py" "$wallet_source" "$app_root/Artifacts"

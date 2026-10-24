@@ -2,6 +2,7 @@ import SwiftUI
 import ZenithKit
 
 struct MembershipView: View {
+  var continueToWork: (() -> Void)? = nil
   @EnvironmentObject private var model: WalletModel
   @State private var trustApproved = false
   @State private var joining = false
@@ -25,7 +26,16 @@ struct MembershipView: View {
                 .font(.caption.monospaced()).textSelection(.enabled)
             }
           }
-          if model.state?.backupVerified != true {
+          if model.state?.membershipActive == true {
+            Section {
+              Text("Your Zenith membership is active. Work access is approved separately by your server’s operator.")
+              if let continueToWork {
+                Button("Continue to Work", action: continueToWork)
+                  .buttonStyle(.borderedProminent)
+                  .accessibilityIdentifier("membership.continue.work")
+              }
+            }
+          } else if model.state?.backupVerified != true {
             Section {
               Text("Check your saved recovery file before joining.")
               NavigationLink("Open Recovery") { RecoveryView() }

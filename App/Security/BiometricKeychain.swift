@@ -35,7 +35,7 @@ import ZenithKit
     context = authentication
     do {
       guard try await authentication.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-        localizedReason: "Unlock your Zenith wallet on this iPhone.") else { throw BiometricUnlockError.cancelled }
+        localizedReason: "Unlock your Zenith wallet on this device.") else { throw BiometricUnlockError.cancelled }
       try Task.checkCancellation()
       guard context === authentication else { throw BiometricUnlockError.cancelled }
       return authentication

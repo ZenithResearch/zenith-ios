@@ -11,6 +11,12 @@ actor TailscaleDriver: PrivateNetworkDriver {
   private var interactiveLoginPending = false
 
   func start(interactive: Bool) async throws {
+    try await start(interactive: interactive, authKey: nil)
+  }
+  func enroll(authKey: String) async throws {
+    try await start(interactive: false, authKey: TailscaleEnrollment.validatedKey(authKey))
+  }
+  private func start(interactive: Bool, authKey: String?) async throws {
     guard node == nil else { throw PrivateNetworkError.interrupted }
     let base = try FileManager.default.url(for: .applicationSupportDirectory,
       in: .userDomainMask, appropriateFor: nil, create: true)
@@ -21,7 +27,7 @@ actor TailscaleDriver: PrivateNetworkDriver {
     resources.isExcludedFromBackup = true
     try directory.setResourceValues(resources)
     let config = Configuration(hostName: "zenith-ios", path: directory.path,
-      authKey: nil, controlURL: kDefaultControlURL, ephemeral: false)
+      authKey: authKey, controlURL: kDefaultControlURL, ephemeral: false)
     let created = try TailscaleNode(config: config, logger: QuietTailscaleLogger())
     node = created
     interactiveLoginPending = interactive

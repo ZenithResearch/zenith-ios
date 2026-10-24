@@ -1,6 +1,143 @@
+## Native identity consistency — build 33
+
+- Keep legacy Matrix/Nostr application records read-only and preserve their files.
+- Route all new identity edits and reviewed legacy copying through Wallet identities.
+- Keep Tailscale configuration editable in application settings.
+- Reject stale legacy create/edit/delete operations in application save adapters.
+
+## Portable Wallet identities — unreleased
+
+- Pin shared public core0.3.0 at `054b372d686e2f8dba0ad8bbd166adbde9ebab38`.
+- Add core-owned Matrix/Nostr/GitHub/X public identity descriptors with reviewed
+  edits and explicit copying of legacy app records; preserve originals/Tailscale.
+- Read and review Castawayv2 before writing it, preserve v1 files and newer records
+  during old-file imports, and show existing derived crypto account addresses.
+- Cover descriptor bounds, conflicts, encryption, actual backup/restore and
+  lock/stale-revision behavior with native C ABI integration tests.
+
+## Wallet backup boundary — unreleased
+
+- Restrict Wallet navigation to data covered by implemented recovery or Castaway
+  backup paths. Show portable membership proofs instead of provider setup.
+- Move application account records, Network, provider setup and unlock settings
+  into Settings; preserve existing storage and exports.
+- Keep service access outside Wallet until database backup/restore coverage exists.
+
+## Native Wallet consistency — unreleased
+
+- Share the Wallet home, public account records, password visibility/Copy controls
+  and recovery-password reuse across macOS, iPad and iPhone.
+- Default automatic lock to one hour of inactivity, with 15-minute, four-hour and
+  until-lock-or-quit choices; preserve existing timeout preferences.
+- Keep unlock separate from every connection and signing review; expired input
+  cannot revive custody, and background refreshes cannot extend it.
+- Pin the native core to public Castalia `575895f70e4cbdc982b7c9271b468470271dbb0b`.
+
 # Changelog
 
 ## [Unreleased]
+
+### Changed
+
+- Align native iOS build 29 with public `ZenithResearch/castalia-wallet` revision `7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485` — use the same canonical Wallet source as Transfer build 33 and Chrome 0.0.2 while preserving the native ABI, encrypted custody and app identity.
+
+- Expose embedded Tailscale sign-in in iOS server setup before a connection file is available. Discover private servers through the selected network, retain that route when saving, and cancel stale discovery when the route or network changes.
+
+- Reconcile the credential-setting completion plan with build 16 and the unfinished production activation boundary — keep the native preset/scope editor as the deliverable and prevent isolated test results from replacing the real DevGraph acceptance gates.
+
+### Added
+
+- Replace the grant-selection web renderer with Transfer’s native Swift credential editor in build 16 — select action presets independently from explicit global or multiple inherited resource paths, review the exact grant, and preserve original-action recovery while onward delegation stays disabled.
+
+### Fixed
+
+- Give native resource, preset and owner actions an explicit contrasting button style and clarify delegation limits in build 15 — installed review found system-accent primary buttons rendered white on white.
+
+
+### Added
+
+- Add native owner permission setup and versioned credential recipes with shared Seat-type references in Transfer build 14 — separate permissions from resource scope, preserve exact reviewed snapshots and avoid treating saved setup plans as production authority.
+
+
+- Remove the optional machine-local membership resource from the checked-in project — make clean iPad builds work without distributing a local endpoint; align generated build metadata.
+
+- Resolve Cargo output for native framework packaging — allow clean builds on a scratch volume without assuming source-local artifacts.
+
+### Changed
+
+- Pin the published operator Wallet source and verified DevGraph editor provenance for Transfer build 10 — make the reviewed native resource console reproducible without changing its custody or grant behavior.
+
+### Added
+
+- Discover owner-protected services from ~/.zenith/resources/v1 in Transfer build 9 — review public local connection settings without manually finding a server URL or importing authority. Separate configured monitors from Wallet-ready HTTPS services and keep saved issuer/TLS pins unchanged until review.
+
+- Add opt-in password reveal and explicit Copy controls throughout Transfer Wallet — allow inspection and native paste without showing or copying passwords automatically. Build 8.
+
+- Add explicit native operator consent and a bundled, origin-bound DevGraph grant editor in Transfer build 7 — keep private signing inside Castalia while preserving original-action recovery after uncertain responses. Native member consent remains narrow.
+- Share the discovered recovery-file catalog between Wallet import and QR transfer — select existing backups by filename, date and folder without browsing again; distinguish data files and re-read recovery contents before identity review.
+
+- Add the Transfer resource registry, isolated native Wallet setup and per-resource browser inbox entry — reuse the working grant flow while explicitly refusing to pass native operator approvals through member consent. Build 6 reuses Zenith artwork and preserves file transfer; native operator signing and generic service adapters remain open.
+
+### Changed
+
+- Reuse the recovery-file password for Transfer’s local unlock by default, while allowing a separate local password — avoid forcing an unexplained replacement password. Show the native minimum before submission, keep the selected encrypted file after failed preparation and display only closed Wallet error messages.
+
+- Reject stale-path symlinks before coordinated encrypted-file reads and open descriptors without following final links — cached discovery metadata must not redirect Wallet import. Stage packaged app replacements instead of overwriting a running executable.
+
+- Use a bounded native resource tree with explicit inherited coverage — global requests and multiple container roots must remain separate from operation presets without rewriting stored requests.
+
+- Separate permission presets from a global request or multi-select resource hierarchy — retain exact v2 preferences while making descendant inheritance and multiple Arena/Initiative/Project roots explicit.
+
+- Use the versioned native graph API and verify its ABI while preserving existing Wallet data — graph requests depend on custody/backup and resource policy rather than a universal community membership gate.
+
+
+### Added
+
+- Add the explicit dated/until-revoked grant validity reader and common rejection/attenuation vectors — mobile clients need the same lifetime semantics as the server while old connections remain unchanged.
+
+### Added
+- Native server preset and Arena/Initiative/Project request picker with exact path disclosure and scoped-read compatibility — members can request reusable access without pasted credentials, while rejected preparations and lost responses preserve safe recovery. Build 22 updates the existing app without changing Wallet custody.
+
+
+### Fixed
+
+- Open Membership in a dedicated sheet with a return to the saved Work server and consume setup continuation once — avoid navigation cancellation interfering with joining and premature read attempts before operator access is assigned. Development build 21.
+
+### Added
+
+- Replace the placeholder Z with the existing ZenithOS brand artwork and retain its source provenance — use the real Zenith identity on the Home Screen and welcome screen. Development build 20.
+- Add a mint Zenith app icon and matching welcome mark — make the installed app recognizable on the Home Screen. Development build 19.
+- Add public HTTPS server discovery and native request/status consent with durable request IDs — remote members can request access and recover uncertain responses without pasted credentials or duplicate requests.
+
+### Added
+
+- Prepare on-device speech to text in the Chat composer with explicit microphone permission, editable transcripts, bounded recording and cleanup on interruption/locking. Sending remains manual. Development build 17.
+
+### Added
+
+- Add explicit Tailscale auth-key enrollment with secure entry or a bounded text-file import in the shared Work/Chat connection screen. Keep browser sign-in and existing saved device identities; never replay enrollment keys on foreground resume. Development build 16.
+
+### Fixed
+
+- Let Hermes assign conversation titles — repeated New chat actions must not collide with its unique-title constraint.
+- Keep chat authentication and oversized-response diagnostics separate from Wallet recovery errors — make gateway problems actionable without exposing error bodies.
+
+
+### Added
+
+- Add native text chat with a personal Hermes gateway over embedded Tailscale — let the iPhone converse with a normal Hermes profile while keeping its gateway key separate from Wallet custody.
+- Persist a pending-send marker and reload server conversation history — avoid automatically sending a prompt twice after locking or losing the connection.
+
+
+### Added
+
+- Accept explicitly versioned monitor read scopes alongside historical native connections — let Zenith read Todos, canonical progress, full details and permitted relationships using its existing Wallet core.
+
+### Fixed
+
+- Follow server revision/cursor pagination and decode canonical string metadata — avoid missing modern pages or presenting a list summary as a complete item.
+- Disclose granted operations and relationship types before read approval — keep native consent aligned with the exact issuer permissions.
+
 
 ### Fixed
 

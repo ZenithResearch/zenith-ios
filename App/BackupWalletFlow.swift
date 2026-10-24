@@ -45,7 +45,7 @@ struct BackupFlowView: View {
     WalletFlowPage(step: isOnboarding ? "Create · 2 of 3" : "Recovery backup",
       title: "Save your recovery backup",
       detail: "This file lets you restore your wallet on another device. Give it a password you can keep safe.",
-      buttonTitle: "Save recovery file", enabled: password.count >= 12 && password == confirmation,
+      buttonTitle: "Save recovery file", enabled: WalletPasswordRules.permitsLocal(password) && password == confirmation,
       busy: model.busy, action: export) {
         WalletPasswordField(title: "Backup password", prompt: "At least 12 characters", text: $password, isNew: true)
         WalletPasswordField(title: "Repeat backup password", text: $confirmation, isNew: true)

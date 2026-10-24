@@ -9,7 +9,7 @@ public struct RecoveryFileFormat: Equatable, Sendable {
   public let contentsSchema: String?
   public let legacyFilename: Bool
   public var title: String { kind == .recovery ? "Wallet recovery" : "Castaway data" }
-  public var version: String { "v1" }
+  public var version: String { schema == "castalia.castaway.v2" ? "v2" : "v1" }
   public var badge: String { legacyFilename ? "Legacy filename" : "Current format" }
   public var explanation: String {
     if legacyFilename {
@@ -91,6 +91,16 @@ public enum RecoveryFileCatalog {
           problem: "This folder could not be read. Use Choose another file to select a backup.")
       }
     }
+  }
+
+  /// Re-read the selected file at import time; a cached discovery row is never
+  /// authority to restore identity. Castaway data cannot become custody by name.
+  public static func readRecovery(_ url: URL) throws -> Data {
+    let data = try EncryptedImportFile.read(url)
+    guard try RecoveryFileFormat.inspect(data, filename: url.lastPathComponent).kind == .recovery else {
+      throw RecoveryTransferError.invalidFile
+    }
+    return data
   }
 
   public static func inspect(_ url: URL) -> RecoveryCatalogFile {

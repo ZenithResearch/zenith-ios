@@ -1,4 +1,5 @@
 import SwiftUI
+import ZenithKit
 
 /// Creation never passes through the recovery-import screen.
 struct CreateView: View {
@@ -8,7 +9,7 @@ struct CreateView: View {
   var body: some View {
     WalletFlowPage(step: "Create · 1 of 3", title: "A password for this phone",
       detail: "This unlocks your wallet here. Next, you’ll save and check a recovery backup.",
-      buttonTitle: "Create wallet", enabled: password.count >= 12 && password == confirmation,
+      buttonTitle: "Create wallet", enabled: WalletPasswordRules.permitsLocal(password) && password == confirmation,
       busy: model.busy, action: create) {
         WalletPasswordField(title: "Wallet password", prompt: "At least 12 characters", text: $password, isNew: true)
         WalletPasswordField(title: "Repeat wallet password", text: $confirmation, isNew: true)

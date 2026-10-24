@@ -5,10 +5,12 @@ public enum PrivateNetworkPhase: Equatable, Sendable {
   case idle, connecting, signInRequired, awaitingApproval, connected, paused, failed
 }
 public enum PrivateNetworkError: Error, LocalizedError, Equatable {
-  case disconnected, invalidStatus, interrupted
+  case disconnected, invalidStatus, interrupted, invalidAuthKey, enrollmentFailed
   public var errorDescription: String? {
     switch self {
-    case .disconnected: return "Connect Tailscale in Work connection before trying again."
+    case .disconnected: return "Connect Tailscale in Connection before trying again."
+    case .invalidAuthKey: return "Use a Tailscale auth key beginning with tskey-auth-."
+    case .enrollmentFailed: return "Tailscale enrollment did not complete. Check that the auth key is valid, unexpired and unused, then try again. Your network may also require device approval."
     case .invalidStatus: return "The private connection could not be verified. Reconnect Tailscale to try again."
     case .interrupted: return "The private connection changed. Please try again."
     }
@@ -53,9 +55,42 @@ public struct PrivateNetworkStatus: Sendable {
 
 public protocol PrivateNetworkDriver: Sendable {
   func start(interactive: Bool) async throws
+  func enroll(authKey: String) async throws
   func status() async throws -> PrivateNetworkStatus
   func configuration() async throws -> URLSessionConfiguration
   func stop() async
+}
+
+/// Older drivers fail closed rather than silently starting browser sign-in.
+public extension PrivateNetworkDriver {
+  func enroll(authKey: String) async throws { throw PrivateNetworkError.enrollmentFailed }
+}
+
+/// Enrollment accepts an auth key, never an API token or an OAuth client secret.
+/// This is transient input, independent of Wallet and gateway connection files.
+public enum TailscaleEnrollment {
+  public static func validatedKey(_ raw: String) throws -> String {
+    let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard (32...512).contains(key.utf8.count), key.hasPrefix("tskey-auth-"),
+      key.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
+        || (48...57).contains($0) || $0 == 45 })
+    else { throw PrivateNetworkError.invalidAuthKey }
+    return key
+  }
+  public static func importKey(_ data: Data) throws -> String {
+    guard data.count <= 1024, let text = String(data: data, encoding: .utf8) else {
+      throw PrivateNetworkError.invalidAuthKey
+    }
+    return try validatedKey(text)
+  }
+}
+
+/// A task may poll for minutes; don't retain its submitted key in that closure.
+@MainActor
+private final class PendingEnrollment {
+  private var value: String?
+  init(_ value: String) { self.value = value }
+  func take() -> String? { defer { value = nil }; return value }
 }
 
 /// App-scoped network lifecycle, independent of custody and read authority.
@@ -71,11 +106,16 @@ public final class PrivateNetworkSession: ObservableObject {
   private let driver: any PrivateNetworkDriver
   private var operation: Task<Void, Never>?
   private var resumeRequested = false
+  private var enrollmentInput: PendingEnrollment?
   private struct WeakTransport { weak var value: PrivateTransport? }
   private var transports: [WeakTransport] = []
   public init(driver: any PrivateNetworkDriver) { self.driver = driver }
 
   public func connect() { begin(interactive: true) }
+  public func enroll(authKey: String) throws {
+    let pending = PendingEnrollment(try TailscaleEnrollment.validatedKey(authKey))
+    begin(interactive: false, enrollment: pending)
+  }
   public func disconnect() { stop(phase: .idle, resume: false) }
   public func cancelSignIn() { disconnect() }
   public func suspend() {
@@ -87,16 +127,18 @@ public final class PrivateNetworkSession: ObservableObject {
     resumeRequested = false
     begin(interactive: false)
   }
-  public func transport() -> PrivateTransport {
+  public func transport(requestTimeout: TimeInterval = 20, resourceTimeout: TimeInterval = 30) -> PrivateTransport {
     let transport = PrivateTransport(configurationProvider: { [weak self] in
       guard let self else { throw PrivateNetworkError.disconnected }
       return try await self.configuration()
-    })
+    }, requestTimeout: requestTimeout, resourceTimeout: resourceTimeout)
     transports.removeAll { $0.value == nil }
     transports.append(WeakTransport(value: transport))
     return transport
   }
   private func invalidate() {
+    _ = enrollmentInput?.take()
+    enrollmentInput = nil
     generation += 1
     authURL = nil
     networkName = nil
@@ -115,10 +157,15 @@ public final class PrivateNetworkSession: ObservableObject {
       await driver.stop()
     }
   }
-  private func begin(interactive: Bool) {
+  private func startDriver(interactive: Bool, enrollment: PendingEnrollment?) async throws {
+    if let key = enrollment?.take() { try await driver.enroll(authKey: key) }
+    else { try await driver.start(interactive: interactive) }
+  }
+  private func begin(interactive: Bool, enrollment: PendingEnrollment? = nil) {
     let previous = operation
     previous?.cancel()
     invalidate()
+    enrollmentInput = enrollment
     let ticket = generation
     phase = .connecting
     message = nil
@@ -128,8 +175,8 @@ public final class PrivateNetworkSession: ObservableObject {
       await driver.stop()
       do {
         try Task.checkCancellation()
-        try await driver.start(interactive: interactive)
-        let deadline = Date().addingTimeInterval(300)
+        try await self?.startDriver(interactive: interactive, enrollment: enrollment)
+        let started = Date()
         while !Task.isCancelled {
           let status = try await driver.status()
           guard let self, ticket == self.generation, !Task.isCancelled else { break }
@@ -141,10 +188,13 @@ public final class PrivateNetworkSession: ObservableObject {
             self.message = "Tailscale disconnected. Reconnect to continue."
             break
           }
-          self.phase = status.phase
+          // Key enrollment never presents browser authentication, including
+          // when an invalid key makes the control plane return NeedsLogin.
+          self.phase = enrollment != nil && status.phase == .signInRequired ? .connecting : status.phase
           self.networkName = status.networkName
-          self.authURL = status.authURL
-          if status.phase != .connected && Date() > deadline {
+          self.authURL = enrollment == nil ? status.authURL : nil
+          let timeout: TimeInterval = enrollment == nil || status.phase == .awaitingApproval ? 300 : 45
+          if status.phase != .connected && Date().timeIntervalSince(started) > timeout {
             throw PrivateNetworkError.disconnected
           }
           try await Task.sleep(nanoseconds: status.phase == .connected ? 5_000_000_000 : 1_000_000_000)
@@ -153,7 +203,9 @@ public final class PrivateNetworkSession: ObservableObject {
         if let self, ticket == self.generation, !Task.isCancelled {
           self.invalidate()
           self.phase = .failed
-          self.message = "Couldn’t connect Tailscale. Check your internet connection and try again."
+          self.message = enrollment == nil
+            ? "Couldn’t connect Tailscale. Check your internet connection and try again."
+            : PrivateNetworkError.enrollmentFailed.localizedDescription
         }
       }
       await driver.stop()

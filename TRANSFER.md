@@ -1,4 +1,6 @@
-# Offline recovery transfer
+# Zenith Transfer
+
+Companion build 6 adds a **Resources & requests** console and an isolated native **Wallet** beside the existing **Transfer files** helper. See [RESOURCE-CONSOLE.md](RESOURCE-CONSOLE.md) for the current implementation and native approval boundary and installed qualification still required. Build 7 adds a bundled DevGraph grant editor and native Castalia operator approval; the browser remains an option. File discovery and QR transfer remain local and do not unlock or import anything by themselves.
 
 Build 3 adds **Scan laptop QR** and **Use USB cable** to recovery selection, backup checking, and data-file import. Choose the matching destination: a recovery file restores signing identity; an ordinary Castaway data file requires a matching wallet. Transfer never performs the import itself.
 
@@ -14,7 +16,7 @@ Companion build 4 lists files directly inside `~/.castalia`, Downloads and Docum
 | `castalia.castaway.v1`, with `castalia.castaway-contents.v1` | v1 | Castaway data; requires a matching wallet |
 | Custody v1 in an old `.castaway` or `.castalia-wallet` filename | v1 | Legacy filename; naming is deprecated, recovery contents remain supported |
 
-Header inspection does not verify the encrypted contents, trust or membership proofs. No decryption, conversion, renaming or wallet mutation occurs during discovery. The companion does not access installed wallet storage, keys or credentials. It has no server, listener, browser, relay, pairing secret or networking code and never asks for a password. This is a local development Mac app, not a notarized distribution build.
+Header inspection does not verify the encrypted contents, trust or membership proofs. No decryption, conversion, renaming or wallet mutation occurs during file discovery or QR transfer. Those tools do not access installed wallet storage, keys or credentials and never ask for a password. The separate Wallet screen now accepts passwords for explicit native create/import/unlock/backup operations, and Resources can look up public HTTPS connection settings and open the selected server's inbox in your browser. There is no server, listener, relay or pairing secret. This is a local development Mac app, not a notarized distribution build.
 
 Companion build 5 shows a saved date and time on each file and its detail view. This uses the local file's last modification time, not the wallet creation timestamp or an inferred date from its filename. The list is ordered newest first across all discovered folders, with a stable path tie-breaker; unavailable dates appear last. The containing folder remains on each row, with folder scan details available below the list.
 

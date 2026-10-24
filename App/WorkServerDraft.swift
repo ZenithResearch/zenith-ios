@@ -7,6 +7,7 @@ import ZenithKit
 final class WorkServerDraft: ObservableObject {
   @Published var active = false
   @Published var address = ""
+  @Published var discoverViaTailscale = true
   @Published var name = "Devgraph"
   @Published var issuer = ""
   @Published var keyID = ""
@@ -19,6 +20,7 @@ final class WorkServerDraft: ObservableObject {
   func reset() {
     active = false
     address = ""
+    discoverViaTailscale = true
     name = "Devgraph"
     issuer = ""
     keyID = ""

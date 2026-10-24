@@ -79,6 +79,8 @@ public final class PrivateTransport: @unchecked Sendable {
   private let configurationProvider: @Sendable () async throws -> URLSessionConfiguration
   private let lanTrust: LANServerTrust?
   private let guardLock = NSLock()
+  private var requestTimeout: TimeInterval = 20
+  private var resourceTimeout: TimeInterval = 30
   private var generation = 0
   private var sessions: [UUID: URLSession] = [:]
   public init(configuration: URLSessionConfiguration = .ephemeral) {
@@ -87,15 +89,17 @@ public final class PrivateTransport: @unchecked Sendable {
   }
   /// Used by the private-network route. Failure must propagate; never retry
   /// with a default/direct session when this provider is unavailable.
-  public init(configurationProvider: @escaping @Sendable () async throws -> URLSessionConfiguration) {
+  public init(configurationProvider: @escaping @Sendable () async throws -> URLSessionConfiguration, requestTimeout: TimeInterval = 20, resourceTimeout: TimeInterval = 30) {
     lanTrust = nil
     self.configurationProvider = configurationProvider
+    self.requestTimeout = min(600, max(1, requestTimeout))
+    self.resourceTimeout = min(600, max(self.requestTimeout, resourceTimeout))
   }
   /// Trust is scoped to this reviewed LAN receiver, never installed system-wide.
   public init(workServer: WorkAccessConfiguration) throws {
     try workServer.validate()
     guard workServer.network != .tailscale else { throw PrivateNetworkError.disconnected }
-    lanTrust = try workServer.network == .lan ? LANServerTrust(configuration: workServer) : nil
+    lanTrust = try (workServer.network == .lan || workServer.network == .local) ? LANServerTrust(configuration: workServer) : nil
     configurationProvider = { .ephemeral }
   }
   func verifiesLAN(_ configuration: WorkAccessConfiguration) -> Bool {
@@ -133,12 +137,13 @@ public final class PrivateTransport: @unchecked Sendable {
     let configuration = try await configurationProvider()
     try Task.checkCancellation()
     configuration.httpCookieStorage = nil
+    if lanTrust?.host == "127.0.0.1" { configuration.connectionProxyDictionary = [:] }
     configuration.httpShouldSetCookies = false
     configuration.urlCredentialStorage = nil
     configuration.urlCache = nil
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-    configuration.timeoutIntervalForRequest = 20
-    configuration.timeoutIntervalForResource = 30
+    configuration.timeoutIntervalForRequest = requestTimeout
+    configuration.timeoutIntervalForResource = resourceTimeout
     let session = URLSession(configuration: configuration, delegate: RedirectBlocker(lanTrust: lanTrust), delegateQueue: nil)
     let id = UUID()
     try register(session, ticket: version, id: id)
@@ -173,7 +178,24 @@ public final class PrivateTransport: @unchecked Sendable {
       value == ["error": "access_denied"]
     else { throw WalletFailure.core("invalid_response") }
   }
-  public func request(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> Data {
+  /// Discovery-only fixed metadata GETs. No identity, bearer, cookies or stored
+  /// credentials are sent; loopback HTTP is limited to /live for old APIs.
+  public func publicServiceMetadata(at origin: URL, path: String) async throws -> Data {
+    guard ["/live","/.well-known/devgraph-connection.json"].contains(path),
+      origin.path.isEmpty,origin.user == nil,origin.password == nil,origin.query == nil,origin.fragment == nil,
+      origin.scheme == "https" || (origin.scheme == "http" && origin.host == "127.0.0.1" && path == "/live"),
+      lanTrust == nil || lanTrust!.permits(origin) else { throw WalletFailure.core("service_setup_required") }
+    let url=origin.appendingPathComponent(String(path.dropFirst()))
+    var request=URLRequest(url:url,timeoutInterval:3);request.httpMethod="GET"
+    let (id,session)=try await openSession();defer { finish(id) }
+    let (bytes,response)=try await session.bytes(for:request,delegate:session.delegate as? URLSessionTaskDelegate)
+    guard let response=response as? HTTPURLResponse,response.statusCode==200,response.url==url,
+      response.expectedContentLength<=16384 else { throw WalletFailure.core("invalid_response") }
+    var data=Data()
+    for try await byte in bytes { guard data.count<16384 else { throw WalletFailure.invalidFile };data.append(byte) }
+    return data
+  }
+  public func request(_ request: URLRequest, maximum: Int = 1_048_576, viewChangedOnConflict: Bool = false) async throws -> Data {
     if let lanTrust, request.url.map({ !lanTrust.permits($0) }) ?? true {
       throw WalletFailure.core("service_setup_required")
     }
@@ -188,6 +210,9 @@ public final class PrivateTransport: @unchecked Sendable {
     if response.statusCode == 401 || response.statusCode == 403 {
       throw WalletFailure.core("access_denied")
     }
+    if response.statusCode == 409 && viewChangedOnConflict {
+      throw WalletFailure.core("work_view_changed")
+    }
     guard (200..<300).contains(response.statusCode) else {
       throw WalletFailure.core("service_rejected_request")
     }
@@ -201,6 +226,31 @@ public final class PrivateTransport: @unchecked Sendable {
     }
     return data
   }
+  /// Operator protocols distinguish a definitive rejection from an uncertain
+  /// result. Preserve bounded status/body while retaining the same TLS,
+  /// redirect, cookie and cancellation boundary as ordinary requests.
+  public func exchange(_ request: URLRequest, maximum: Int = 1_048_576) async throws -> PrivateHTTPResponse {
+    guard request.url?.scheme == "https", request.url?.user == nil, request.url?.password == nil,
+      maximum > 0, maximum <= 1_048_576,
+      lanTrust == nil || request.url.map({ lanTrust!.permits($0) }) == true
+    else { throw WalletFailure.core("service_setup_required") }
+    let (id, session) = try await openSession(); defer { finish(id) }
+    let (bytes, response) = try await session.bytes(for: request, delegate: session.delegate as? URLSessionTaskDelegate)
+    guard let response = response as? HTTPURLResponse, response.url == request.url,
+      response.expectedContentLength < 0 || response.expectedContentLength <= maximum
+    else { throw WalletFailure.core("invalid_response") }
+    var data = Data()
+    for try await byte in bytes {
+      guard data.count < maximum else { throw WalletFailure.invalidFile }; data.append(byte)
+    }
+    return PrivateHTTPResponse(status: response.statusCode, data: data)
+  }
+}
+
+public struct PrivateHTTPResponse: Sendable {
+  public let status: Int
+  public let data: Data
+  public init(status: Int, data: Data) { self.status = status; self.data = data }
 }
 
 extension MembershipConfiguration {

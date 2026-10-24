@@ -25,6 +25,87 @@ private final class ResponseProtocol: URLProtocol {
   override func stopLoading() {}
 }
 final class TransportTests: XCTestCase {
+  func testOperatorExchangePreservesBoundedDefinitiveRejection() async throws {
+    let bytes = Data(#"{"error":"operator_assignment_changed"}"#.utf8)
+    let response = try await transport(status:409,data:bytes).exchange(URLRequest(url:URL(string:"https://example.test/devgraph/access-operator/v1/actions")!),maximum:1024)
+    XCTAssertEqual(response.status,409); XCTAssertEqual(response.data,bytes)
+    do {
+      _ = try await transport(status:409,data:Data(repeating:65,count:1025)).exchange(URLRequest(url:URL(string:"https://example.test")!),maximum:1024)
+      XCTFail("Bounded errors")
+    } catch { }
+  }
+  func testDiscoveryIsPublicBoundedAndCannotMoveTheReceiver() async throws {
+    let config = try WorkAccessConfiguration(name:"Remote test",receiver:URL(string:"https://example.test")!,issuer:"test",keyID:"key",publicKey:String(repeating:"12",count:32))
+    let encoded = try JSONEncoder().encode(config)
+    let discovered = try await WorkServerDiscovery.discover("https://example.test",transport:transport(status:200,data:encoded))
+    XCTAssertEqual(discovered,config)
+    do {
+      _ = try await WorkServerDiscovery.discover("https://different.test",transport:transport(status:200,data:encoded))
+      XCTFail("Discovery cannot select a different receiver")
+    } catch { }
+    do {
+      _ = try await WorkServerDiscovery.discover("https://example.test",transport:transport(status:302,data:encoded))
+      XCTFail("No redirect")
+    } catch { }
+  }
+  func testRequestRecordSurvivesRelaunchWithoutCreatingAnotherID() throws {
+    let directory=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at:directory) }
+    let store=try WorkAccessRequestStore(directory:directory)
+    let first=try store.begin(receiver:"https://example.test",subject:String(repeating:"11",count:32),installation:String(repeating:"22",count:16))
+    let reloaded=try WorkAccessRequestStore(directory:directory).begin(receiver:first.receiver,subject:first.subject,installation:first.installation)
+    XCTAssertEqual(first,reloaded)
+    XCTAssertNil(try store.existing(receiver:"https://other.test",subject:first.subject,installation:first.installation))
+    let files=try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:nil)
+    XCTAssertEqual(files.count,1)
+    let fields=try JSONSerialization.jsonObject(with:Data(contentsOf:files[0])) as! [String:Any]
+    XCTAssertEqual(Set(fields.keys),["receiver","subject","installation","requestID"])
+  }
+  func testTailscaleDiscoveryPreservesVerificationAndSavedRoute() async throws {
+    let config = try WorkAccessConfiguration(name: "Private server", receiver: URL(string: "https://example.test")!,
+      issuer: "test", keyID: "key", publicKey: String(repeating: "12", count: 32))
+    let discovered = try await WorkServerDiscovery.discover("https://example.test", network: .tailscale,
+      transport: transport(status: 200, data: JSONEncoder().encode(config)))
+    XCTAssertEqual(discovered.network, .tailscale)
+    XCTAssertEqual(discovered.authority, config.authority)
+    XCTAssertEqual(discovered.receiver, config.receiver)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try WorkServerStore(directory: directory).save(discovered, replacing: nil)
+    XCTAssertEqual(try WorkServerStore(directory: directory).load(), discovered)
+  }
+  func testTailscaleDiscoveryRequiresPrivateTransportAndDoesNotFallback() async throws {
+    do {
+      _ = try await WorkServerDiscovery.discover("https://example.test", network: .tailscale)
+      XCTFail("A private route must be supplied")
+    } catch { XCTAssertEqual(error as? PrivateNetworkError, .disconnected) }
+    let disconnected = PrivateTransport(configurationProvider: { throw PrivateNetworkError.disconnected })
+    do {
+      _ = try await WorkServerDiscovery.discover("https://example.test", network: .tailscale, transport: disconnected)
+      XCTFail("A disconnected private route must fail")
+    } catch { XCTAssertEqual(error as? PrivateNetworkError, .disconnected) }
+  }
+  func testDiscoveryHonorsPrivateProfilesAndRejectsReceiverChanges() async throws {
+    let config = try WorkAccessConfiguration(name: "Private server", receiver: URL(string: "https://example.test")!,
+      issuer: "test", keyID: "key", publicKey: String(repeating: "12", count: 32), network: .tailscale)
+    let encoded = try JSONEncoder().encode(config)
+    let discovered = try await WorkServerDiscovery.discover("https://example.test", network: .tailscale,
+      transport: transport(status: 200, data: encoded))
+    XCTAssertEqual(discovered, config)
+    for (address, network) in [("https://example.test", WorkNetwork?.none),
+      ("https://different.test", WorkNetwork?.some(.tailscale))] {
+      do {
+        _ = try await WorkServerDiscovery.discover(address, network: network,
+          transport: transport(status: 200, data: encoded))
+        XCTFail("Discovery cannot change the selected route or receiver")
+      } catch { XCTAssertTrue(error is WorkServerSetupError) }
+    }
+    do {
+      _ = try await WorkServerDiscovery.discover("https://example.test", network: .tailscale,
+        transport: transport(status: 302, data: encoded))
+      XCTFail("Private discovery cannot follow redirects")
+    } catch { XCTAssertEqual(error as? WalletFailure, .core("service_rejected_request")) }
+  }
   func testReadConnectionRequiresSeparateIssuerPin() throws {
     let old = Data(#"{"name":"Work","issuer":"example","receiver":"https://example.test"}"#.utf8)
     XCTAssertThrowsError(try JSONDecoder().decode(WorkAccessConfiguration.self, from: old))

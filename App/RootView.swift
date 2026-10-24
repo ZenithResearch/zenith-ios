@@ -19,7 +19,9 @@ struct RootView: View {
           } else {
             TabView(selection: $destination) {
               NativeWorkView().tabItem { Label("Work", systemImage: "list.bullet") }.tag("work")
+              HermesChatView().tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }.tag("chat")
               WalletView().tabItem { Label("Wallet", systemImage: "wallet.pass") }.tag("wallet")
+              ApplicationSettingsView().tabItem { Label("Settings", systemImage: "gearshape") }.tag("settings")
             }
           }
         } else if model.repository != nil {
@@ -29,7 +31,7 @@ struct RootView: View {
             "Wallet unavailable", systemImage: "externaldrive.badge.exclamationmark",
             description: Text(model.error ?? "Reopen Zenith to try again."))
         }
-      }
+      }.disabled(model.paused)
       if model.obscured {
         Color(uiColor: .systemBackground).ignoresSafeArea().overlay(
           Text("Zenith").font(.title2).bold()
@@ -60,6 +62,10 @@ struct WelcomeView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 24) {
             Spacer()
+            Image("ZenithMark")
+              .resizable().scaledToFit().frame(width: 80, height: 80)
+              .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+              .accessibilityHidden(true)
             Text("Welcome to Zenith").font(.largeTitle).bold()
             Text("Start fresh or bring your wallet to this phone.").foregroundStyle(
               .secondary)
@@ -108,49 +114,28 @@ private struct WalletStartChoice: View {
 }
 struct WalletView: View {
   @EnvironmentObject private var model: WalletModel
-  @State private var connected = false
+  @State private var path: [WalletDestination] = []
   var body: some View {
-    NavigationStack {
-      List {
-        Section {
-          NavigationLink {
-            MembershipView()
-          } label: {
-            StatusRow(
-              title: "Membership",
-              status: model.state?.membershipActive == true ? "Active" : "Not connected",
-              icon: "person.crop.circle.badge.checkmark")
-          }
-          NavigationLink {
-            RecoveryView()
-          } label: {
-            StatusRow(
-              title: "Recovery",
-              status: model.state?.backupVerified == true
-                ? "Recovery checked" : "Check your recovery file", icon: "doc.badge.arrow.up")
-          }
-          NavigationLink {
-            WorkAccessView()
-          } label: {
-            StatusRow(
-              title: "Work access", status: connected ? "Read only" : "Not connected", icon: "eye")
+    NavigationStack(path: $path) {
+      WalletHomeContent(publicKey: model.state?.publicKey, unlocked: model.state?.unlocked == true,
+        backupVerified: model.state?.backupVerified == true, membershipActive: model.state?.membershipActive == true,
+        accessSummary: "",
+        open: { path.append($0) }, lock: model.suspend)
+        .navigationDestination(for: WalletDestination.self) { destination in
+          switch destination {
+          case .identities: PortableWalletIdentitiesView(repository: model.repository, unlocked: model.state?.unlocked == true, legacy: model.identityAccounts, changed: { Task { await model.load() } })
+          case .membership: WalletMembershipContent(repository: model.repository, unlocked: model.state?.unlocked == true)
+          case .recovery: RecoveryView()
+          case .access: WorkAccessView()
+          case .security: WalletSecurityView()
+          case .about: WalletAboutContent()
           }
         }
-        Section {
-          DisclosureGroup("Wallet details") {
-            Text("Castalia Member Key").font(.caption).foregroundStyle(.secondary)
-            Text(model.state?.publicKey ?? "").font(.caption.monospaced()).textSelection(.enabled)
-          }
-          NavigationLink("Unlock & security") { WalletSecurityView() }
-          Button("Lock wallet", systemImage: "lock") { model.suspend() }
-        }
-        Section { Feedback() }
-      }.navigationTitle("Wallet")
-        .task { connected = (try? await workClient(model)?.manifest()) != nil }
-        .onChange(of: model.generation) { _, _ in connected = false }
+
     }
   }
 }
+
 struct StatusRow: View {
   let title: String, status: String, icon: String
   var body: some View {
@@ -186,5 +171,27 @@ struct SetupInformation: View {
         ).foregroundStyle(.secondary)
       }
     }.navigationTitle(kind == .membership ? "Membership" : "Work access")
+  }
+}
+
+struct ApplicationSettingsView: View {
+  var body: some View {
+    NavigationStack {
+      List {
+        Section("Application settings") {
+          NavigationLink("Network") {
+            Form {
+              Section("Private network") { PrivateNetworkRow() }
+              Section("Saved server") { NavigationLink("Work server connection") { WorkAccessView() } }
+              Section { Text("Connections and device enrollment belong to this app. They are not included in Wallet backups.").foregroundStyle(.secondary) }
+            }.navigationTitle("Network")
+          }
+          NavigationLink("Application accounts") { WalletIdentitiesView() }
+          NavigationLink("Membership provider") { MembershipView() }
+          NavigationLink("Unlock & security") { WalletSecurityView() }
+          NavigationLink("How Wallet and application storage differ") { WalletAboutContent() }
+        }
+      }.navigationTitle("Settings")
+    }
   }
 }

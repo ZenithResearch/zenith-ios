@@ -1,12 +1,18 @@
 # Zenith iOS preview
 
-A greenfield, native SwiftUI app with **Work** and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
+A greenfield, native SwiftUI app with **Work**, **Chat**, and **Wallet**. Castalia Wallet owns custody; Devgraph owns read authorization and work data. This implements the reviewed Zenith roadmap as a separate app. Provider trust and Work access always require explicit local approval.
 
 Status: native preview with source checks and signed device builds. Work server setup is generic and stored only on the user's device; no deployment endpoint is built in. **Not a generally qualified release or App Store distribution.** See [implementation status](IMPLEMENTATION-STATUS.md) and [qualification](QUALIFICATION.md).
 
 ## Build
 
 Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. The embedded TailscaleKit build requires iOS 18.1 or later; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
+
+Build 29 pins public `ZenithResearch/castalia-wallet` revision
+`7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485`, matching Transfer build 33 and Chrome
+0.0.2. The native core implementation and C ABI are unchanged from the prior
+private pin. The framework is rebuilt from the public source; this does not
+migrate Wallet storage, change server grants or replace saved connection settings.
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
@@ -42,6 +48,10 @@ Use the selected phone's identifier and approved team ID for these variables. A 
 
 The phone has its own wallet storage. Installing the app does not copy Simulator custody. Create a disposable wallet or explicitly restore its encrypted recovery file through the app. Membership and work access still require the separate configuration and approval below. Successful installation is not completion of the physical-device qualification checklist.
 
+## Hermes chat
+
+Chat connects to a personal Hermes gateway over the existing embedded Tailscale connection. It uses Hermes's authenticated Sessions API, keeps the gateway key in the device-only Keychain, and reloads server-side conversation history. See [Hermes chat](HERMES-CHAT.md) for setup, interrupted-send behavior and qualification.
+
 ## Product behavior
 
 - A new installation starts with exactly two choices: **Create a wallet** and **Scan to import**. Create opens the local-password page; Scan opens the camera immediately. The journeys use separate screens and navigation state.
@@ -51,7 +61,7 @@ The phone has its own wallet storage. Installing the app does not copy Simulator
 - Import `.castaway` data only into the matching unlocked identity. Profile/proof replacements are previewed; absent proofs are preserved. Export can recover the supported data again. Nothing is published.
 - Legacy raw recovery **input** remains under recovery help and requires creating/checking an encrypted backup. There is no ordinary private-key reveal, copy, or seed phrase.
 - Membership and Work access are distinct, explicit choices. A restored membership proof remains inactive. Restored data never reinstates a read credential.
-- Work presents bounded pages and one type filter; the search is explicitly over loaded work. Unknown legacy progress is “Progress not recorded.” The receiver's legacy read projection currently admits Proposal, Initiative, Project, Issue, and Task; base Todo and canonical progress require a later delegated-read contract extension, not inferred lifecycle values.
+- Work presents bounded pages and one type filter; the search is explicitly over loaded work. Unknown legacy progress is “Progress not recorded.” Legacy receivers retain the five-type reader. Monitor-capable receivers also expose Todo, canonical progress and explicitly granted related-work reads. Snapshot revisions and server cursors drive pagination; details are fetched through the separate get permission. See [read compatibility](READ-COMPATIBILITY.md).
 
 The interface uses native forms, lists, file pickers, a scrolling welcome screen, adaptive accent color, public detail disclosure, and a privacy cover while inactive. A saved file-selection may survive in memory as encrypted bytes; password fields and previews are cleared on locking. Optional biometric unlock keeps a separately protected password in the device-only Keychain, as described below.
 
@@ -74,12 +84,14 @@ Password fields support iOS Password AutoFill. People can separately save the pa
 
 ## Configuration and consent
 
+For a server address, open **Work → Connection**, leave **Use Tailscale** enabled, and tap **Connect Tailscale** to join your server’s network. Once connected, enter the private HTTPS address and tap **Find server**. Discovery and subsequent Work requests use Zenith’s embedded Tailscale connection. Turn **Use Tailscale** off for direct HTTPS. Server verification and read approval remain separate steps.
+
 In **Work → Connection** (also **Wallet → Work access**), choose **Connect to [server]** when a valid connection file is found in Zenith’s Documents folder. For a private server, this button starts the embedded Tailscale sign-in. Instructions appear in the app; no separate Tailscale app is needed. After sign-in, **Continue to read access** saves the reviewed public server settings and, when membership is active, fetches the permission preview. Only **Allow read-only access** authorizes the disclosed scope. If membership is missing, the app directs the person to Membership and keeps the selected server.
 
 If no file is present, choose **Choose connection file** or expand **Need help finding your server?** for Files/USB instructions. The administrator supplies the public issuer pin independently of enrollment. Manual address/key entry is a separate advanced screen. Merely discovering or importing a file never installs trust, sends identity, or grants access. Server identity and public-key details remain available in a disclosure before saving. There are no built-in private server names, addresses, or issuer keys.
 Settings stay in OS-protected Application Support, excluded from backups. Removing a server disconnects its local read authority. Adding a server always requires a fresh read approval, including when returning to a previously used address. A different issuer pin is never learned from an enrollment response. Builds exclude `App/WorkAccess.json`, even if someone has left an ignored copy locally. Existing preview users must explicitly set up their server after upgrading; prior bundled settings are not silently migrated.
 
-A distributor may supply a **public proposed membership configuration** as `App/Membership.json`. It requires local approval and is separate from Work server setup. It has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
+A distributor may supply a **public proposed membership configuration** as `App/Membership.json`. The checked-in Xcode project builds without this optional, ignored file. To bundle a distributor-proposed configuration, supply it locally and regenerate the project with `xcodegen generate`; review that configuration before distribution. It requires local approval and is separate from Work server setup. It has `name`, an HTTPS `endpoint`, optional `scope` (the canonical v4 community ID), and `trust`. Trust contains `v3` and/or `v4` using the existing Castalia policy schemas. For v4, scope genesis, issuer list and signature roots must agree. Omitting `scope` selects compatible v3 membership. These are issuer public keys, never private keys or bearer credentials.
 
 Example administrator-provided Work connection file (placeholders only):
 
@@ -109,6 +121,19 @@ Read credentials are encrypted in the local snapshot and excluded from portable 
 
 `WalletRepository` is a Swift actor around an opaque Rust C ABI. Rust owns keys, portable validation, prepared imports, approval state and encryption. Swift sees public previews and encrypted snapshots. An immediate lifecycle gate plus task cancellation invalidates pending work on cancel, backgrounding, or device lock.
 
+iOS build26 retains the unlocked native core across tab changes, app switching
+and device locking while the app process remains alive. Background/device-lock
+events still obscure the screen, stop network work and invalidate pending consent.
+Foreground waits for that cancellation before allowing fresh actions. A new
+approval can sign without another password; it is never silently resumed or
+submitted in the background. **Lock wallet**, app termination and a fresh launch
+still require unlocking. iOS may terminate a background process at any time, so
+unlock retention is not guaranteed after returning to an app that the OS ended.
+No unlocked flag, plaintext password or decrypted key is saved for this feature;
+the existing optional biometric Keychain flow is unchanged. The same policy applies
+to iPhone and iPad. Physical-device acceptance of build26 is separate from the
+native synthetic consent/cancellation tests and successful universal build.
+
 `SnapshotStore` saves one encrypted snapshot using SQLite `BEGIN IMMEDIATE`, expected-revision comparison, and durable commit. Core confirmation occurs after persistence completes. File protection is complete while the device is locked and the app directory is excluded from OS backup. This is password-encrypted app custody, not a Secure Enclave or hardware-wallet claim. If a commit completes just as the app locks, the next unlock loads that complete record; it never exposes a partial restore.
 
 The shared core remains application-neutral. Its internal recovery/read-approval operations are not browser provider capabilities. There is no arbitrary-sign method in the native bridge. Swift strings and platform file-picker buffers cannot promise complete runtime memory erasure; the app minimizes their lifetime and never logs or persists them in plaintext.
@@ -129,3 +154,62 @@ AGPL is the preferred direction for a future licensing review, as noted on Octob
 ## Embedded private networking
 
 See [PRIVATE-NETWORK.md](PRIVATE-NETWORK.md) for the UX, lifecycle and qualification boundaries. TailscaleKit wraps pinned libtailscale and is confined to `App/Networking`; Wallet custody and signing still use the unchanged shared Rust core. `Dependencies.json`, the checked privacy patch and `Artifacts/tailscale-build.json` identify the native framework. No tailnet name, reusable join key, private hostname or operator issuer pin is bundled.
+
+
+### Preset and dynamic-area requests (build 22)
+
+For a server running the opt-in Devgraph v7 grant runtime, **Request or check access**
+loads the server's published catalog. Choose **Contributor**, **Project Manager** or
+**No preset**, then include an Arena, Initiative or Project area. Multiple areas may
+be requested. The consent screen shows the exact preset reference and paths; the
+operator still chooses the final permissions. A path covers matching resources at
+each access, including future descendants and excluding objects moved outside it.
+
+The native client accepts explicitly versioned scoped-read credentials and preserves
+their paths through Wallet approval, encrypted storage, relaunch and signed reads.
+Existing servers and saved requests retain their original protocol. Unknown outcomes
+check the original ID; **Request different access** is offered only after a known
+result, with the previous public request archived. A new client installation does
+not activate server grants or extend an expired test window.
+
+### Resource scope selection
+
+Work access requests separate the permission preset from the resource scope. Global
+requests carry no explicit path restriction; the operator chooses the actual grant
+within its policy. Selected areas use a native disclosure hierarchy with searchable
+titles, typed IDs, multiple roots and inherited descendants. A selected container
+covers current/future descendants at access time; moving work out removes that
+coverage. The UI normalizes redundant child roots and limits independent roots to
+16. Existing v2 requests, original IDs and signed bytes are unchanged. Installing
+this picker does not activate or expand a grant.
+
+### Transfer access management
+
+The Mac companion manages registered resources directly using its own Castalia
+Wallet. **Manage access in Transfer** opens the bundled request and grant editor,
+including Wallet unlock and native approval of each exact decision. It does not
+launch an external browser. Each resource admits its own operator keys and enforces
+its own policy. See [Transfer access management](docs/transfer-access-management.md)
+for the signing boundary and installed qualification status.
+
+Transfer uses the native Castalia Rust core through its Swift actor; the Wallet
+does not run in a browser. Build29 shares one Wallet/model across app windows and
+defaults to locking one hour after unlock. **Wallet → Unlock duration** supports
+2/5/15/30 minutes, 1/4 hours, or until explicit lock/quit. Switching apps no longer
+locks custody. Reads do not silently extend the unlock period. Lock/timeout still
+invalidates pending consent; launch starts locked. The last unlocked public key is
+an explicitly labeled display-only preference, never an authentication session or
+operator admission. Already-loaded information remains browsable while locked;
+new authenticated reads and signatures still require an unlocked native Wallet.
+Exact signing consent, request expiry and server credential validity are unchanged.
+
+The native **Credential presets** library creates versioned permission recipes and
+shared Seat-type references. **Set up owner & access** on the local DevGraph
+selects those permissions separately from global or inherited container paths and
+validity. Build14 saves reviewed plans; production owner installation is still
+pending and is never implied by a saved recipe.
+
+Build27 adds one automatic Touch ID unlock prompt at launch on iPad when biometric unlock is already enabled. iPhone keeps its explicit unlock button. Cancellation/failure does not auto-retry, and manual Lock wallet suppresses automatic prompting for the rest of that app process. Password fallback and separate access approvals remain available. The server picker now labels copied JSON profiles as “Saved connection files”; this is not network discovery.
+
+The [native Wallet experience](docs/native-wallet-experience.md) describes the shared
+Wallet home, recovery/password controls and configurable inactivity lock.

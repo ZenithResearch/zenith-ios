@@ -9,7 +9,7 @@ For a server on the same Wi-Fi, [Local network setup](LOCAL-NETWORK.md) provides
 The UX and lifecycle review selected one Connection picker and one status/action row:
 
 1. Open **Work → Connection** (also available through **Wallet → Work access**).
-2. Tap **Connect to [server]** for a validated profile already in Zenith’s Documents folder. This explicit action starts private sign-in if needed. If there is no profile, **Choose connection file** and the in-app help explain how to obtain one; manual entry stays separate.
+2. **Use Tailscale** is available in the main setup screen, initially enabled for new setup drafts. Tap **Connect Tailscale** to sign in before entering a server address. After connection, **Find server** fetches the same-origin public verification settings through the embedded node and retains `network: "tailscale"` when saving. Turning the toggle off explicitly selects direct HTTPS. Alternatively, tap **Connect to [server]** for a validated profile already in Zenith’s Documents folder, or **Choose connection file**; manual entry stays separate.
 3. Sign in using the system browser and join the network supplied by the server administrator. Administrator device approval may still be required. Simply importing a file or choosing a route in the manual form does not start networking.
 4. Return to **Continue to read access**. The public pin remains reviewable under server verification details. Saving the server can fetch a scope preview, but never grants access.
 5. Approve the exact read scope. Missing membership leads to Membership setup first. Connection checks and saved network management remain available afterward.

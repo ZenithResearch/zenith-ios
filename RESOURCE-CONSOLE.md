@@ -1,0 +1,66 @@
+# Resource and credential console
+
+Zenith Transfer build 10 includes native Castalia operator consent to the resource console introduced in build 6. Encrypted recovery-file QR transfer is preserved. This is local development software, not a notarized distribution build.
+
+## Resource registration and requests
+
+**On this Mac** reads owner-protected public service records from `~/.zenith/resources/v1`. It refreshes at launch, app activation and on demand. Discovery performs no network request, grants no access and never reads `.zenith/config.json`, Wallet databases, local bearer files or private service configuration. It shows discovered services separately from saved connections. An instance UUID stays independent of its endpoint and Wallet identity.
+
+Review a Wallet-ready service's public connection before saving it. Changed local records never silently replace saved issuer or TLS settings. A loopback-only monitor without an HTTPS Wallet profile is shown as needing connection setup; registration cannot make that legacy API an operator endpoint. The reader bounds records/counts, holds private owner-owned directories, rejects links/unsafe permissions and malformed closed JSON, and skips unsupported records. The record is advisory configuration rather than a liveness or owner-signature claim. DevGraph's matching opt-in `local resource register` publisher and `local start/restart` refresh hook are described in its `docs/dev/local-resource-discovery.md`; the same 22 vectors are tested by both producers and consumers. Other resource adapters remain separate work.
+
+
+Import a closed, bounded DevGraph public connection file or look up `/.well-known/devgraph-connection.json` at an explicitly entered HTTPS origin. Lookup sends no Wallet identity. Review the origin, issuer key and optional LAN certificate fingerprint before registration. Replacing settings shows both versions and rejects stale saved records. Registration does not establish ownership, authorize an operator, grant member access or install browser/system certificate trust.
+
+Choose **Review requests & grants in Transfer** after setting up/unlocking the Castalia Wallet. The bundled DevGraph editor separates permission presets from global or multiple hierarchical resource roots. It loads the server's current authenticated operator ceiling and pending requests, reviews exact selections, activates read/write grants and revokes them through the existing versioned APIs. A selected container covers qualifying resources beneath it at the time of access, including future descendants. Server-side policy, native admission, current containment, workflow gates and revocation still apply. Until-revoked grants are distinct from short-lived approval challenges, issued credentials, TLS certificates and signing keys.
+
+The browser inbox remains available as a separate option. Browser custody, site connection and HTTPS trust are independent. Existing active grants can be inspected/revoked; editing an active grant without a new member request still requires the separately planned revision contract.
+
+Other Hub/secS services are not supported merely because a port is open. They need a compatible, independently reviewed management capability and ownership/trust configuration. No server address, identity, pin or synthetic resource is bundled as a product default.
+
+## Native custody and consent
+
+Transfer uses its own encrypted Wallet snapshot under `Application Support/ZenithTransfer/Wallet`. The shared Rust core owns create/import/unlock/backup and signing. Wallet import shares the encrypted-file catalog with Transfer files, including manually chosen files. The picker shows filenames, saved dates and folders, separates recovery backups from data/unavailable files, and supports search, refresh and choosing another file. Legacy recovery filenames are accepted based on contents. Selection re-reads a bounded coordinated snapshot and rejects data envelopes or linked/unavailable files before password-based restore. Import defaults to reusing the recovery-file password for local unlocking, with a separate local password optional. Local passwords follow the native minimum of 12 Unicode scalars and maximum of 4096 UTF-8 bytes; short historical file passwords remain usable with a separate local password. Visible labels explain the two roles. Failed preparation keeps the encrypted file selected, clears password fields and uses closed native error messages. Eye controls reveal/hide each field; explicit Copy is available only when revealed, and normal native paste is supported. Copy uses the Mac clipboard; no password is copied automatically. Revealed fields hide when cleared or the app deactivates. Import reviews the decrypted public identity before committing. It does not read Chrome or main Zenith Wallet databases, create membership, inherit an installation ID or grant operator authority. Password fields clear after submission or leaving the Wallet/app. The Wallet locks on app deactivation and after five minutes. The inbox's Wallet sheet permits manual unlocking without throwing away the current selection.
+
+The additive `castalia.operator-access.v1` capability exposes `prepare_operator_access_v1` and `approve_operator_access_v1` for access.inbox/access.review/access.decide/access.status. Verified native previews disclose complete original action details, policy revision/digest, receiver, issuer and approval deadline. Human confirmation consumes a lifecycle-bound preview once. Lock, cancellation, other preparation, invalid tokens and expiry invalidate consent. The signature domain and challenge bytes are unchanged; the resource independently checks operator authority. Historical native member consent remains restricted to access.request/access.status; unsupported older cores have no operator fallback.
+
+Native confirmation identifies activation, decline, revocation, review or original-status recovery and shows the complete verified signed action. It does not expose a raw-sign, key-export or general native-core command bridge.
+
+## Native/web boundary and recovery
+
+The scope editor is vendored from DevGraph with source revision/file hashes in `Resources/Operator/provenance.json`. `scripts/vendor-transfer-operator.py /path/to/devgraph` reproduces the bundle-relative transport adaptations. Preset attenuation, correlated rule intersection, exact digest checks and original-action recovery remain in the shared editor. No server HTML/script is loaded.
+
+A nonpersistent WKWebView serves only a fixed app-bundled asset allowlist through `zenith-operator://console`. CSP denies direct web connections, frames and remote scripts. Navigation is restricted to that scheme/host. The reply bridge accepts only its exact main-frame WebView and provides public identity, bounded SHA-256, public recovery storage, native consent and the two fixed DevGraph operator POST routes. It cannot call Work mutation endpoints or invoke arbitrary custody commands. The native transport binds requests to the selected HTTPS origin, validates a separately supplied LAN pin with hostname/time checks, disables cookies/caches/credential storage and blocks redirects. Tailscale configurations fail closed without a supported native route.
+
+Before consent the native layer checks the exact action against its original public journal. It verifies raw challenge JSON with Rust before web parsing, then independently matches action, purpose, identity, receiver and policy metadata. Before possible dispatch it durably marks that same original action dispatched. The signed envelope is held only in memory and consumed by that one native POST.
+
+Public recovery records under `Application Support/ZenithTransfer/OperatorActions` contain origin, Wallet/installation, original action, assignment digest and dispatch state, never a signature, key or credential. They are bounded, 0600, coordinated across writers and refuse replacing a possibly dispatched action. Reopening recovers the original result through a signed status action only. Original identity/action/digests stay fixed. A partial/unknown response remains recoverable; a validated result or definitive recognized rejection permits cleanup. No second decision is created automatically.
+
+Registrations are separate bounded public records under `Application Support/ZenithTransfer/Resources`. Removing one removes only its local registration; it does not stop a server or revoke access.
+
+## Verification and remaining work
+
+Canonical task: `Task/zenith-transfer-resource-credentials`, under `Issue/devgraph-access-mvp-delivery`.
+
+- Rust core/native suites, repository npm tests/type checks, all three pinned Apple framework slices, Swift tests and JavaScript syntax checks qualify the component change. Build provenance pins the exact Wallet revision; existing custody/snapshot formats and member APIs remain unchanged.
+- Real-core Swift tests verify disclosure, Ed25519 transcript, one use, lock invalidation and continued rejection of operator actions by member consent. Journal tests preserve unknown originals across reload and reject changed actions/dispatch rollback/extra secret-bearing fields. Transport tests preserve bounded definitive error status/body.
+- Actual WKWebView tests use a disposable Wallet and synthetic server: no action before native consent; accepted inbox proof; a standing-grant decision with an intentionally incomplete response; reopening and status-only recovery without another decision; refusal of direct Work/custody calls and an action/purpose mismatch. These are component fixtures, not installed server activation or issuer qualification.
+- Build 6 Resources/Wallet setup and build 7’s recovery catalog, filtering and data-file separation were visually inspected. Build 8 password controls were visually reviewed and the user completed recovery import. Build 9 shows the locally registered DevGraph and preserves the configured locked Wallet; that private host still needs a reviewed HTTPS Wallet profile. Real selected-resource qualification requires a human-controlled operator Wallet. Opening/importing/registration never substitutes for server admission. Do not mark the whole MVP complete from component tests.
+
+Remaining: installed native grant/revocation and retained-credential qualification; active-grant revision with prefill/diff/monotonic revision/atomic replacement; generic owner-signed resource-management descriptors and Hub adapters; further descendant/move/race tests; physical iPad picker/write acceptance. Nostr/Matrix notifications, cross-graph sync and merging this console into the main Zenith app remain separate work.
+
+Build with Xcode's toolchain using `swift test` and `sh scripts/build-transfer-app.sh`. The packager stages a new bundle and preserves the previous app instead of overwriting an executable mapped by a running process. It includes the offline resource bundle in Contents/Resources and reuses Zenith's established icon.
+
+## Coordinated release
+
+Wallet source is pinned to the graph-access/operator candidate in Wallet PR 33.
+The bundled editor comes from the reviewed DevGraph access candidate; source
+provenance remains explicit and registration confers no authority. Operator
+identity is a Wallet public key admitted by receiver-held policy. A separate
+portable admin credential is follow-on work, not an MVP requirement.
+
+A source merge/build does not configure a server. The existing default private
+DevGraph host and opt-in combined HTTPS receiver are distinct compositions.
+Publish the actual receiver profile, review issuer/TLS changes and preserve
+retained grants and replay state before installed qualification. Fresh CI and
+clean-source build evidence are required for the release candidate; previous
+disposable browser/iPad passes do not certify this native operator deployment.
