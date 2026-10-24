@@ -134,6 +134,15 @@ struct WorkAccessView: View {
                 value: Date(timeIntervalSince1970: Double(current.expires_at)).formatted())
             }
             Section {
+              if reusableAvailable {
+                Button("Review reusable grant…") {
+                  model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+                }.disabled(model.busy)
+                Text(
+                  "Save a provider-signed grant in Wallet without removing this connection or requesting another operator decision."
+                )
+                .font(.footnote)
+              }
               Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
               Button("Remove read access") {
                 model.perform({ _ in try await client.disconnect() }) { _ in
