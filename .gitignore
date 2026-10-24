@@ -14,3 +14,5 @@ App/WorkAccess.json
 
 verification/
 __pycache__/
+
+.test-tmp/

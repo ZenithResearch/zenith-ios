@@ -6,14 +6,22 @@ export IPHONEOS_DEPLOYMENT_TARGET=17.0
 export MACOSX_DEPLOYMENT_TARGET=13.0
 if [ "$#" -ne 1 ]; then echo 'Usage: scripts/build-core.sh /path/to/castalia-wallet' >&2; exit 2; fi
 wallet_source=$(cd "$1" && pwd)
+wallet_origin=$(git -C "$wallet_source" remote get-url origin)
+case "$wallet_origin" in
+  https://github.com/ZenithResearch/castalia-wallet|https://github.com/ZenithResearch/castalia-wallet.git|git@github.com:ZenithResearch/castalia-wallet.git) ;;
+  *) echo 'Wallet source must use the canonical ZenithResearch/castalia-wallet origin' >&2; exit 2 ;;
+esac
 app_root=$(cd "$(dirname "$0")/.." && pwd)
 expected_wallet_revision=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["wallet"]["revision"])' "$app_root/Dependencies.json")
 if [ "$(git -C "$wallet_source" rev-parse HEAD)" != "$expected_wallet_revision" ]; then
   echo "Wallet checkout does not match Dependencies.json" >&2; exit 2
 fi
-git -C "$wallet_source" diff --exit-code HEAD -- Cargo.toml Cargo.lock crates/castalia-wallet-core crates/castalia-wallet-native crates/castalia-wallet-presentation contracts/portable-web >/dev/null || {
+git -C "$wallet_source" diff --exit-code HEAD -- Cargo.toml Cargo.lock crates/castalia-wallet-core crates/castalia-wallet-native crates/castalia-wallet-presentation vendor/secs-grant-contract contracts/portable-web >/dev/null || {
   echo "Wallet build inputs differ from the pinned commit" >&2; exit 2;
 }
+if [ -n "$(git -C "$wallet_source" ls-files --others --exclude-standard -- crates/castalia-wallet-core crates/castalia-wallet-native crates/castalia-wallet-presentation vendor/secs-grant-contract)" ]; then
+  echo 'Wallet build inputs contain uncommitted source files' >&2; exit 2
+fi
 # Cargo may place scratch output outside the source checkout (for example when
 # the source volume is full). Use Cargo's resolved directory for packaging too.
 wallet_target_dir=$(cargo metadata --manifest-path "$wallet_source/Cargo.toml" --no-deps --format-version 1 --locked --offline | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
