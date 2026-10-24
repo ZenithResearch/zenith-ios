@@ -28,10 +28,11 @@ public struct WorkAccessConfiguration: Codable, Sendable, Hashable {
     try validate()
   }
   public func validate() throws {
-    guard network == .lan
+    guard (network == .lan || network == .local)
       ? tls_certificate_sha256?.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
       : tls_certificate_sha256 == nil
     else { throw WalletFailure.core("service_setup_required") }
+    if network == .local, receiver.host != "127.0.0.1" { throw WalletFailure.core("service_setup_required") }
     guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       name.count <= 80, !issuer.isEmpty, issuer.count <= 256, receiver.scheme == "https",
       receiver.host != nil,
@@ -159,7 +160,7 @@ public final class DevgraphReadClient: @unchecked Sendable {
     self.repository = repository
     self.configuration = configuration
     guard configuration.network != .tailscale || transport != nil else { throw PrivateNetworkError.disconnected }
-    if configuration.network == .lan, let transport, !transport.verifiesLAN(configuration) {
+    if configuration.network == .lan || configuration.network == .local, let transport, !transport.verifiesLAN(configuration) {
       throw WalletFailure.core("service_setup_required")
     }
     self.transport = try transport ?? PrivateTransport(workServer: configuration)

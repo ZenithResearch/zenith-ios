@@ -1,8 +1,8 @@
 {
   "schema": "zenith.ios-dependencies.v1",
   "wallet": {
-    "repository": "https://github.com/bananawalnut/castalia-wallet",
-    "revision": "95be8af399e22cf627e20fbb09c9f1cdf09e72aa",
+    "repository": "https://github.com/ZenithResearch/castalia-wallet",
+    "revision": "054b372d686e2f8dba0ad8bbd166adbde9ebab38",
     "crates": [
       "castalia-wallet-core",
       "castalia-wallet-native",

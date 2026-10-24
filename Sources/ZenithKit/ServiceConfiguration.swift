@@ -99,7 +99,7 @@ public final class PrivateTransport: @unchecked Sendable {
   public init(workServer: WorkAccessConfiguration) throws {
     try workServer.validate()
     guard workServer.network != .tailscale else { throw PrivateNetworkError.disconnected }
-    lanTrust = try workServer.network == .lan ? LANServerTrust(configuration: workServer) : nil
+    lanTrust = try (workServer.network == .lan || workServer.network == .local) ? LANServerTrust(configuration: workServer) : nil
     configurationProvider = { .ephemeral }
   }
   func verifiesLAN(_ configuration: WorkAccessConfiguration) -> Bool {
@@ -137,6 +137,7 @@ public final class PrivateTransport: @unchecked Sendable {
     let configuration = try await configurationProvider()
     try Task.checkCancellation()
     configuration.httpCookieStorage = nil
+    if lanTrust?.host == "127.0.0.1" { configuration.connectionProxyDictionary = [:] }
     configuration.httpShouldSetCookies = false
     configuration.urlCredentialStorage = nil
     configuration.urlCache = nil
@@ -176,6 +177,23 @@ public final class PrivateTransport: @unchecked Sendable {
     guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: String],
       value == ["error": "access_denied"]
     else { throw WalletFailure.core("invalid_response") }
+  }
+  /// Discovery-only fixed metadata GETs. No identity, bearer, cookies or stored
+  /// credentials are sent; loopback HTTP is limited to /live for old APIs.
+  public func publicServiceMetadata(at origin: URL, path: String) async throws -> Data {
+    guard ["/live","/.well-known/devgraph-connection.json"].contains(path),
+      origin.path.isEmpty,origin.user == nil,origin.password == nil,origin.query == nil,origin.fragment == nil,
+      origin.scheme == "https" || (origin.scheme == "http" && origin.host == "127.0.0.1" && path == "/live"),
+      lanTrust == nil || lanTrust!.permits(origin) else { throw WalletFailure.core("service_setup_required") }
+    let url=origin.appendingPathComponent(String(path.dropFirst()))
+    var request=URLRequest(url:url,timeoutInterval:3);request.httpMethod="GET"
+    let (id,session)=try await openSession();defer { finish(id) }
+    let (bytes,response)=try await session.bytes(for:request,delegate:session.delegate as? URLSessionTaskDelegate)
+    guard let response=response as? HTTPURLResponse,response.statusCode==200,response.url==url,
+      response.expectedContentLength<=16384 else { throw WalletFailure.core("invalid_response") }
+    var data=Data()
+    for try await byte in bytes { guard data.count<16384 else { throw WalletFailure.invalidFile };data.append(byte) }
+    return data
   }
   public func request(_ request: URLRequest, maximum: Int = 1_048_576, viewChangedOnConflict: Bool = false) async throws -> Data {
     if let lanTrust, request.url.map({ !lanTrust.permits($0) }) ?? true {
@@ -232,6 +250,7 @@ public final class PrivateTransport: @unchecked Sendable {
 public struct PrivateHTTPResponse: Sendable {
   public let status: Int
   public let data: Data
+  public init(status: Int, data: Data) { self.status = status; self.data = data }
 }
 
 extension MembershipConfiguration {

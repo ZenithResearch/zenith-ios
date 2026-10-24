@@ -34,10 +34,10 @@ final class OwnerSetupTests: XCTestCase {
     XCTAssertThrowsError(try OwnerScopeNode(kind: "Task", resourceID: "task-a", title: "Wrong", path: ["Task/task-a"]))
   }
   func testLocalHTTPSSetupDoesNotExposePrivateAPIOrAcceptForeignURLs() {
-    for value in ["https://127.0.0.1:18443", "https://192.168.1.77:18443", "https://10.0.0.7:18443", "https://172.16.0.2:18443"] {
+    for value in ["https://127.0.0.1:18443", "https://192.168.50.10:18443", "https://10.0.0.7:18443", "https://172.16.0.2:18443"] {
       XCTAssertTrue(OwnerSetupPlan.localWalletAddress(value),value)
     }
-    for value in ["http://192.168.1.77:18443", "https://public.example:18443", "https://8.8.8.8:18443", "https://192.168.1.77:8080", "https://127.0.0.1:7687", "https://127.0.0.1:443", "https://127.0.0.1:18443/path", "https://user:password@127.0.0.1:18443", "https://127.0.0.1:18443?token=none"] {
+    for value in ["http://192.168.50.10:18443", "https://public.example:18443", "https://8.8.8.8:18443", "https://192.168.50.10:8080", "https://127.0.0.1:7687", "https://127.0.0.1:443", "https://127.0.0.1:18443/path", "https://user:password@127.0.0.1:18443", "https://127.0.0.1:18443?token=none"] {
       XCTAssertFalse(OwnerSetupPlan.localWalletAddress(value),value)
     }
   }
@@ -71,6 +71,62 @@ final class OwnerSetupTests: XCTestCase {
     try FileManager.default.createSymbolicLink(at: target.appendingPathComponent(value.resourceID+".json"), withDestinationURL: outside)
     XCTAssertThrowsError(try store.load(resourceID: value.resourceID))
     XCTAssertTrue(FileManager.default.fileExists(atPath: outside.path))
+  }
+  func testOwnerBootstrapDefaultsToAdministrationWithoutAMemberSelection() throws {
+    let resource = LocalResource(resource_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "DevGraph on this Mac",
+      endpoint: "http://127.0.0.1:8080", connection: nil, updated_at: 1)
+    let inspection = OwnerSetupInspection(resource: resource, registrationSHA256: String(repeating: "a", count: 64),
+      configurationSHA256: String(repeating: "b", count: 64), healthy: true)
+    let plan = try OwnerSetupPlan.ownerBootstrap(resource: resource, inspection: inspection,
+      ownerPublicKey: String(repeating: "c", count: 64), walletEndpoint: "https://192.168.50.10:18443", now: 100)
+    XCTAssertEqual(plan.scopeMode, "global"); XCTAssertTrue(plan.paths.isEmpty)
+    XCTAssertEqual(plan.writeOperations, OwnerPermissionPreset.allOperations)
+    XCTAssertEqual(plan.effectiveReads, CredentialPresetRevision.allReads)
+    XCTAssertNil(plan.notAfter); XCTAssertNil(plan.presetSnapshot)
+    XCTAssertEqual(plan.status, "prepared_not_applied"); XCTAssertFalse(plan.publishHierarchy)
+    XCTAssertEqual(try OwnerSetupPlan.decode(plan.encoded()), plan)
+    let stopped = OwnerSetupInspection(resource: resource, registrationSHA256: inspection.registrationSHA256,
+      configurationSHA256: inspection.configurationSHA256, healthy: false)
+    XCTAssertThrowsError(try OwnerSetupPlan.ownerBootstrap(resource: resource, inspection: stopped,
+      ownerPublicKey: plan.ownerPublicKey, walletEndpoint: plan.walletEndpoint, now: 100))
+    let other = LocalResource(resource_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: resource.name,
+      endpoint: resource.endpoint, connection: nil, updated_at: 1)
+    XCTAssertThrowsError(try OwnerSetupPlan.ownerBootstrap(resource: other, inspection: inspection,
+      ownerPublicKey: plan.ownerPublicKey, walletEndpoint: plan.walletEndpoint, now: 100))
+  }
+  func testOwnerRegistrationCannotRedirectTheSelectedConnection() throws {
+    let resource = LocalResource(resource_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "DevGraph on this Mac",
+      endpoint: "http://127.0.0.1:8080", connection: nil, updated_at: 1)
+    let target = OwnerRegistrationTarget(resource: resource)
+    XCTAssertEqual(target.resourceID, resource.id)
+    XCTAssertEqual(target.endpoint, resource.endpoint)
+    XCTAssertTrue(target.needsInstalledWalletSupport)
+    let inspection = OwnerSetupInspection(resource: resource, registrationSHA256: String(repeating: "a", count: 64),
+      configurationSHA256: String(repeating: "b", count: 64), healthy: true)
+    for address in ["https://192.168.50.10:18443", "https://192.168.50.10:19443", "https://127.0.0.1:18443"] {
+      let separateListener = try OwnerSetupPlan.ownerBootstrap(resource: resource, inspection: inspection,
+        ownerPublicKey: String(repeating: "c", count: 64), walletEndpoint: address, now: 100)
+      XCTAssertThrowsError(try target.check(separateListener), address)
+      // Historical plans remain readable as evidence, without being reused for
+      // registration against a different selected connection.
+      XCTAssertEqual(try OwnerSetupPlan.decode(separateListener.encoded()), separateListener)
+    }
+  }
+  func testInspectionChecksTheSelectedServerAgainstTheCLIsActualEndpoint() throws {
+    for port in [8181, 8282] {
+      let endpoint = "http://127.0.0.1:\(port)"
+      let row: [String: Any] = ["schema": "zenith.local-resource.v1",
+        "resource_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "kind": "devgraph",
+        "name": "Selected graph", "endpoint": endpoint, "connection": NSNull(), "updated_at": 1]
+      let registration = try JSONSerialization.data(withJSONObject: row)
+      let selected = try LocalResource.decode(registration)
+      let status = try JSONSerialization.data(withJSONObject: ["healthy": true, "api": ["api": ["base_url": endpoint]]])
+      XCTAssertEqual(try OwnerSetupInspector.verifiedInspection(selected, registration: registration,
+        configuration: Data("{}".utf8), status: status).resource.endpoint, endpoint)
+      let wrong = try JSONSerialization.data(withJSONObject: ["healthy": true, "api": ["api": ["base_url": "http://127.0.0.1:8080"]]])
+      XCTAssertThrowsError(try OwnerSetupInspector.verifiedInspection(selected, registration: registration,
+        configuration: Data("{}".utf8), status: wrong))
+    }
   }
   func testOptionalReadOnlyInstalledDiscovery() async throws {
     guard ProcessInfo.processInfo.environment["ZENITH_OWNER_SETUP_READONLY_SMOKE"] == "1" else { throw XCTSkip("explicit read-only installed DevGraph check") }

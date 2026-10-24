@@ -1,5 +1,15 @@
 # Access management in Transfer
 
+Build29 changes custody lifetime only: the native Wallet is shared across windows,
+defaults to a one-hour unlock interval and no longer locks when the app loses focus.
+The duration can be changed in Wallet, including explicit-lock/quit mode. Starting
+the app does not restore decrypted keys. Manual lock/timeout invalidates pending
+proofs while retaining public display identity and loaded editor data. No bearer
+session, new read grant or relaxed signing consent is introduced. New authenticated
+server reads still need Wallet proof. The short per-action review timers remain
+independent of the longer unlock period. This source/build change is not yet an
+installed acceptance check of build29.
+
 The current delivery sequence and production acceptance gates are maintained in
 [Transfer credential-setting completion plan](transfer-credential-completion-plan.md).
 Build16 is the native editor milestone; production activation is still unfinished.

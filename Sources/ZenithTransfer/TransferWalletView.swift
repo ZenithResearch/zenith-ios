@@ -29,9 +29,12 @@ struct TransferWalletView: View {
         Text("Your signing identity in this Mac app. Recovery files are decrypted only by the shared Castalia core.")
           .foregroundStyle(.secondary)
         if let state = model.wallet, state.configured {
-          Text(state.unlocked ? "Wallet unlocked" : "Wallet locked").font(.title2.bold())
-          Text(state.publicKey ?? "").font(.caption.monospaced()).textSelection(.enabled)
-          if state.unlocked {
+          Text(model.walletUnlocked ? "Wallet unlocked" : "Wallet locked").font(.title2.bold())
+          if let key=model.displayPublicKey {
+            Text(model.walletUnlocked ? "Wallet public identity" : "Last unlocked public identity").font(.caption).foregroundStyle(.secondary)
+            Text(key).font(.caption.monospaced()).textSelection(.enabled)
+          }
+          if model.walletUnlocked {
             Label(state.backupVerified ? "Recovery backup checked" : "Recovery backup needs checking",
               systemImage: state.backupVerified ? "checkmark.shield" : "externaldrive.badge.exclamationmark")
             Button("Lock Wallet") { clear(); model.lock() }
@@ -50,6 +53,15 @@ struct TransferWalletView: View {
             TransferPasswordField(title: "Wallet unlock password", text: $password, submit: unlock)
             Button("Unlock Wallet") { unlock() }.buttonStyle(.borderedProminent)
               .disabled(model.busy || password.isEmpty)
+          }
+          Divider()
+          Text("Unlock duration").font(.headline)
+          Picker("Lock automatically",selection:$model.unlockDuration) {
+            ForEach(TransferUnlockDuration.allCases) { Text($0.label).tag($0) }
+          }.frame(maxWidth:380)
+          Text("Measured from the time you unlock. Switching apps does not lock your Wallet. Reads and background refreshes do not extend the timer.").font(.caption).foregroundStyle(.secondary)
+          if model.walletUnlocked,let deadline=model.unlockDeadline {
+            Text("Locks at " + deadline.formatted(date:.omitted,time:.shortened)).font(.caption)
           }
         } else if model.wallet != nil {
           Picker("Set up this app's Wallet", selection: $mode) {
@@ -101,7 +113,7 @@ struct TransferWalletView: View {
         Text("Grant approvals").font(.headline)
         Text("Choose a registered DevGraph in Resources & requests to review its inbox and approve an exact selection using this Castalia Wallet. The server must already authorize your Wallet as an operator. Unlocking here does not unlock Chrome.")
           .foregroundStyle(.secondary)
-        Text("This app stores its encrypted Wallet separately from Zenith and Chrome. It locks when you leave the app and after five minutes. Passwords never enter the resource registry.")
+        Text("This app stores its encrypted Wallet separately from Zenith and Chrome. It starts locked after launch and locks when you choose Lock Wallet, quit, or reach the selected timeout. Signing decisions still require their own approval. Public identity and loaded information remain visible while locked. Passwords never enter the resource registry.")
           .font(.footnote).foregroundStyle(.secondary)
       }.frame(maxWidth: 640, alignment: .leading).padding(28)
     }.disabled(model.busy)

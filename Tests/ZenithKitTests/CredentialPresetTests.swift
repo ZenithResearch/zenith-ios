@@ -43,6 +43,18 @@ final class CredentialPresetTests: XCTestCase {
     XCTAssertEqual((try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? NSNumber)?.intValue, 0o600)
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [first.presetID + ".json"])
   }
+  func testWorkReadsCannotEncodeArenaOrOwnerAuthority() throws {
+    // Presentation changes must not widen the existing credential contract.
+    XCTAssertEqual(WorkReadPermission.allCases.map(\.rawValue), CredentialPresetRevision.allReads)
+    for operation in ["arena.list", "arena.get", "read.arenas", "owner", "access.admin"] {
+      XCTAssertNil(WorkReadPermission(rawValue: operation))
+      XCTAssertThrowsError(try CredentialPresetRevision(presetID: "invalid-reads", revision: 1,
+        name: "Unsupported", readOperations: [operation], writeOperations: []))
+    }
+    let reads = try CredentialPresetRevision(presetID: "work-reader", revision: 1,
+      name: "Work reader", readOperations: ["list", "get", "relationships"], writeOperations: [])
+    XCTAssertEqual(try CredentialPresetRevision.decode(reads.encoded()).readOperations, CredentialPresetRevision.allReads)
+  }
   func testUnsafeStorageAndLinkedHistoryAreRefused() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

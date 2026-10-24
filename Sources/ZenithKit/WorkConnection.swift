@@ -4,6 +4,7 @@ import Foundation
 public enum WorkNetwork: String, Codable, Sendable, Hashable {
   case tailscale
   case lan
+  case local
 }
 
 public struct WorkConnectionFailure: LocalizedError, Sendable {
@@ -26,6 +27,7 @@ public struct WorkConnectionFailure: LocalizedError, Sendable {
     if network == .lan {
       return "Can’t reach your work server on this network. Join the same Wi-Fi as your server and allow Local Network access for Zenith in Settings, then try again."
     }
+    if network == .local { return "Can’t reach DevGraph on this Mac. Check that its Wallet administration service is running." }
     return "Can’t reach your work server. Check your internet connection and try again."
   }
 }

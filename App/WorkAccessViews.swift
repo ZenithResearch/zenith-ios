@@ -4,7 +4,7 @@ import ZenithKit
 @MainActor
 func workClient(_ model: WalletModel) -> DevgraphReadClient? {
   guard let configuration = model.workServer,
-    let repository = model.repository
+    let repository = model.repository, !model.paused, !model.obscured
   else { return nil }
   let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : nil
   return try? DevgraphReadClient(repository: repository, configuration: configuration, transport: transport)

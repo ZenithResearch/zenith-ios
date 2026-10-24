@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AD1F8B4A7B6F4C13A524E210 /* WalletIdentitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1F8B4A7B6F4C13A524E211 /* WalletIdentitiesView.swift */; };
 		04846B98E374EF8E24B77B22 /* HermesChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76C2B4569D4805FDA76BBCD /* HermesChatModel.swift */; };
 		08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */; };
 		14222823819B4E0D23FD043A /* PortableViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */; };
@@ -57,6 +58,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AD1F8B4A7B6F4C13A524E211 /* WalletIdentitiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletIdentitiesView.swift; sourceTree = "<group>"; };
 		0C04F090FA5BABC292CD0F24 /* RecoveryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecoveryViews.swift; sourceTree = "<group>"; };
 		1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletFlowComponents.swift; sourceTree = "<group>"; };
 		2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreDataAttachmentSheet.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 				816148DAF0ACAFA83EE9439E /* RootView.swift */,
 				E6248D401A43A1978C64A543 /* TransferViews.swift */,
 				1BE7CF60D111C8A6721BB0DD /* WalletFlowComponents.swift */,
+				AD1F8B4A7B6F4C13A524E211 /* WalletIdentitiesView.swift */,
 				4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */,
 				E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */,
 				A991E568D963A960C0F62136 /* WorkConnectionSection.swift */,
@@ -314,6 +317,7 @@
 				8C81F434E3DECC5BD2551999 /* TransferViews.swift in Sources */,
 				8DDE8D079C945A00DF552A24 /* UnlockView.swift in Sources */,
 				8CCB3A40301BE61DB5E12030 /* WalletFlowComponents.swift in Sources */,
+				AD1F8B4A7B6F4C13A524E210 /* WalletIdentitiesView.swift in Sources */,
 				75CECC4EE61881B98D3CD447 /* WorkAccessRequestSection.swift in Sources */,
 				A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */,
 				45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */,
@@ -390,7 +394,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 33;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",
@@ -417,7 +421,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 33;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",

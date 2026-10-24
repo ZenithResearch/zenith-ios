@@ -8,6 +8,12 @@ Status: native preview with source checks and signed device builds. Work server 
 
 Requires Xcode, XcodeGen, Rust with `aarch64-apple-darwin`, `aarch64-apple-ios-sim`, and `aarch64-apple-ios` targets, and the Castalia Wallet revision in `Dependencies.json`. Dependencies must be available to Cargo's offline cache. The embedded TailscaleKit build requires iOS 18.1 or later; the development bundle is `ca.zenith.preview.wallet`. No signing team is committed.
 
+Build 29 pins public `ZenithResearch/castalia-wallet` revision
+`7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485`, matching Transfer build 33 and Chrome
+0.0.2. The native core implementation and C ABI are unchanged from the prior
+private pin. The framework is rebuilt from the public source; this does not
+migrate Wallet storage, change server grants or replace saved connection settings.
+
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 scripts/build-core.sh /absolute/path/to/castalia-wallet
@@ -78,6 +84,8 @@ Password fields support iOS Password AutoFill. People can separately save the pa
 
 ## Configuration and consent
 
+For a server address, open **Work → Connection**, leave **Use Tailscale** enabled, and tap **Connect Tailscale** to join your server’s network. Once connected, enter the private HTTPS address and tap **Find server**. Discovery and subsequent Work requests use Zenith’s embedded Tailscale connection. Turn **Use Tailscale** off for direct HTTPS. Server verification and read approval remain separate steps.
+
 In **Work → Connection** (also **Wallet → Work access**), choose **Connect to [server]** when a valid connection file is found in Zenith’s Documents folder. For a private server, this button starts the embedded Tailscale sign-in. Instructions appear in the app; no separate Tailscale app is needed. After sign-in, **Continue to read access** saves the reviewed public server settings and, when membership is active, fetches the permission preview. Only **Allow read-only access** authorizes the disclosed scope. If membership is missing, the app directs the person to Membership and keeps the selected server.
 
 If no file is present, choose **Choose connection file** or expand **Need help finding your server?** for Files/USB instructions. The administrator supplies the public issuer pin independently of enrollment. Manual address/key entry is a separate advanced screen. Merely discovering or importing a file never installs trust, sends identity, or grants access. Server identity and public-key details remain available in a disclosure before saving. There are no built-in private server names, addresses, or issuer keys.
@@ -112,6 +120,19 @@ Read credentials are encrypted in the local snapshot and excluded from portable 
 ## Custody and transaction boundaries
 
 `WalletRepository` is a Swift actor around an opaque Rust C ABI. Rust owns keys, portable validation, prepared imports, approval state and encryption. Swift sees public previews and encrypted snapshots. An immediate lifecycle gate plus task cancellation invalidates pending work on cancel, backgrounding, or device lock.
+
+iOS build26 retains the unlocked native core across tab changes, app switching
+and device locking while the app process remains alive. Background/device-lock
+events still obscure the screen, stop network work and invalidate pending consent.
+Foreground waits for that cancellation before allowing fresh actions. A new
+approval can sign without another password; it is never silently resumed or
+submitted in the background. **Lock wallet**, app termination and a fresh launch
+still require unlocking. iOS may terminate a background process at any time, so
+unlock retention is not guaranteed after returning to an app that the OS ended.
+No unlocked flag, plaintext password or decrypted key is saved for this feature;
+the existing optional biometric Keychain flow is unchanged. The same policy applies
+to iPhone and iPad. Physical-device acceptance of build26 is separate from the
+native synthetic consent/cancellation tests and successful universal build.
 
 `SnapshotStore` saves one encrypted snapshot using SQLite `BEGIN IMMEDIATE`, expected-revision comparison, and durable commit. Core confirmation occurs after persistence completes. File protection is complete while the device is locked and the app directory is excluded from OS backup. This is password-encrypted app custody, not a Secure Enclave or hardware-wallet claim. If a commit completes just as the app locks, the next unlock loads that complete record; it never exposes a partial restore.
 
@@ -171,8 +192,24 @@ launch an external browser. Each resource admits its own operator keys and enfor
 its own policy. See [Transfer access management](docs/transfer-access-management.md)
 for the signing boundary and installed qualification status.
 
+Transfer uses the native Castalia Rust core through its Swift actor; the Wallet
+does not run in a browser. Build29 shares one Wallet/model across app windows and
+defaults to locking one hour after unlock. **Wallet → Unlock duration** supports
+2/5/15/30 minutes, 1/4 hours, or until explicit lock/quit. Switching apps no longer
+locks custody. Reads do not silently extend the unlock period. Lock/timeout still
+invalidates pending consent; launch starts locked. The last unlocked public key is
+an explicitly labeled display-only preference, never an authentication session or
+operator admission. Already-loaded information remains browsable while locked;
+new authenticated reads and signatures still require an unlocked native Wallet.
+Exact signing consent, request expiry and server credential validity are unchanged.
+
 The native **Credential presets** library creates versioned permission recipes and
 shared Seat-type references. **Set up owner & access** on the local DevGraph
 selects those permissions separately from global or inherited container paths and
 validity. Build14 saves reviewed plans; production owner installation is still
 pending and is never implied by a saved recipe.
+
+Build27 adds one automatic Touch ID unlock prompt at launch on iPad when biometric unlock is already enabled. iPhone keeps its explicit unlock button. Cancellation/failure does not auto-retry, and manual Lock wallet suppresses automatic prompting for the rest of that app process. Password fallback and separate access approvals remain available. The server picker now labels copied JSON profiles as “Saved connection files”; this is not network discovery.
+
+The [native Wallet experience](docs/native-wallet-experience.md) describes the shared
+Wallet home, recovery/password controls and configurable inactivity lock.

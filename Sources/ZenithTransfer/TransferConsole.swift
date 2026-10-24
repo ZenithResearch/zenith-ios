@@ -4,9 +4,33 @@ import SwiftUI
 import ZenithKit
 
 @MainActor final class TransferModel: ObservableObject {
-  @Published var wallet: WalletState?
+  @Published var wallet: WalletState? {
+    didSet {
+      let time=clock()
+      unlockTimer.observe(unlocked:wallet?.unlocked == true,now:time.0,uptime:time.1)
+      if wallet?.configured == false {
+        rememberedPublicKey=nil;defaults.removeObject(forKey:Self.identityHintKey)
+      } else if wallet?.unlocked == true,let key=wallet?.publicKey,
+        key.range(of:"^[a-f0-9]{64}$",options:.regularExpression) != nil {
+        rememberedPublicKey=key;defaults.set(key,forKey:Self.identityHintKey)
+      }
+    }
+  }
+  @Published var unlockDuration:TransferUnlockDuration {
+    didSet { defaults.set(unlockDuration.rawValue,forKey:TransferUnlockDuration.settingKey);expire() }
+  }
+  @Published private(set) var locking=false
+  @Published private var unlockTimer=TransferUnlockTimer()
+  // Display hint only. Never used for signing, owner admission or authorization.
+  private static let identityHintKey="Transfer.wallet.lastUnlockedPublicIdentity.v1"
+  @Published private var rememberedPublicKey:String?
+  var displayPublicKey:String? { wallet?.publicKey ?? rememberedPublicKey }
+  var walletUnlocked:Bool { wallet?.unlocked == true && !locking }
+  var unlockDeadline:Date? { unlockTimer.deadline(unlockDuration) }
   @Published var resources: [RegisteredResource] = []
   @Published var localResources: [LocalResource] = []
+  @Published var localServices: [LocalService] = []
+  @Published var localHealth: [String:LocalServiceHealth] = [:]
   @Published var discovering = false
   @Published var discoveryNotice: String?
   @Published var error: String?
@@ -15,14 +39,19 @@ import ZenithKit
   let presetLibrary = TransferPresetLibrary()
   let repository: WalletRepository?
   private let registry: ResourceRegistry?
-  private var unlockedAt: Date?
+  private let defaults:UserDefaults
+  private let clock:()->(Date,TimeInterval)
   private var generation = 0
 
-  init() {
+  init(directory:URL?=nil,defaults:UserDefaults = .standard,
+    clock:@escaping ()->(Date,TimeInterval) = { (Date(),ProcessInfo.processInfo.systemUptime) }) {
+    self.defaults=defaults;self.clock=clock
+    unlockDuration=TransferUnlockDuration.load(defaults)
+    if let key=defaults.string(forKey:Self.identityHintKey),key.range(of:"^[a-f0-9]{64}$",options:.regularExpression) != nil { rememberedPublicKey=key }
     var loadedRepository: WalletRepository?
     var loadedRegistry: ResourceRegistry?
     do {
-      let base = try FileManager.default.url(for: .applicationSupportDirectory,
+      let base = try directory ?? FileManager.default.url(for: .applicationSupportDirectory,
         in: .userDomainMask, appropriateFor: nil, create: true)
         .appendingPathComponent("ZenithTransfer", isDirectory: true)
       loadedRepository = try WalletRepository(directory: base.appendingPathComponent("Wallet"))
@@ -34,16 +63,31 @@ import ZenithKit
   func discoverLocalResources() async {
     guard !discovering else { return }
     discovering = true
-    let result = await Task.detached { LocalResourceDiscovery.scan() }.value
-    localResources = result.resources
-    discoveryNotice = result.unavailable ? "The local resource registry could not be read safely." :
-      (result.rejected > 0 ? "Some unsupported or invalid resource records were skipped." : nil)
+    let (result,services) = await Task.detached { (LocalResourceDiscovery.scan(),LocalServiceDiscovery.scan()) }.value
+    localResources = result.resources;localServices=services.services;localHealth=[:]
+    discoveryNotice = result.unavailable || services.unavailable ? "A local discovery registry could not be read safely." :
+      (result.rejected + services.rejected > 0 ? "Some unsupported or invalid service records were skipped." : nil)
+    let entries=localServices.map { ("service:"+$0.id,$0.endpoint,$0.connection,$0.interface == .walletAPI ? $0.resource_id : nil,$0.interface == .walletAPI ? $0.id : nil) }
+      + localResources.map { ("resource:"+$0.id,$0.endpoint,$0.connection,nil as String?,nil as String?) }
+    // Bound concurrency; these probes send public metadata requests only.
+    for start in stride(from:0,to:entries.count,by:8) {
+      let batch=Array(entries[start..<min(start+8,entries.count)])
+      let checked=await withTaskGroup(of:(String,LocalServiceHealth).self,returning:[String:LocalServiceHealth].self) { group in
+        for entry in batch { group.addTask { (entry.0,await LocalServiceProbe.check(endpoint:entry.1,connection:entry.2,resourceID:entry.3,instanceID:entry.4)) } }
+        var values:[String:LocalServiceHealth]=[:]
+        for await (id,health) in group { values[id]=health };return values
+      }
+      localHealth.merge(checked) { _,new in new }
+    }
     discovering = false
   }
   func refresh() async {
+    let expected=generation
     do {
       resources = try registry?.load() ?? []
-      wallet = try await repository?.state()
+      let state=try await repository?.state()
+      guard expected == generation,!locking else { return }
+      wallet=state;expire()
     } catch { self.error = "Could not read saved settings. Existing files have been preserved." }
   }
   func register(_ value: RegisteredResource, replacing expected: RegisteredResource?) {
@@ -61,19 +105,22 @@ import ZenithKit
   }
   func perform<T>(_ action: @escaping (WalletRepository) async throws -> T,
     success: @escaping (T) -> Void = { _ in }) {
-    guard !busy, let repository else { return }
+    guard !busy, !locking, let repository else { return }
     busy = true; error = nil
     let expected = generation
     Task {
       do {
         let value = try await action(repository)
-        wallet = try await repository.state()
+        let state = try await repository.state()
         guard generation == expected else { busy = false; return }
-        if wallet?.unlocked == true { unlockedAt = Date() }
+        wallet=state
+        expire()
+        guard generation == expected else { busy=false;return }
         busy = false; success(value)
       } catch {
-        wallet = try? await repository.state(); busy = false
+        let state = try? await repository.state(); busy = false
         guard generation == expected else { return }
+        wallet=state
         // WalletFailure exposes a closed, password-free set of messages. Never
         // display arbitrary native/system error text or interpolate input.
         self.error = (error as? WalletFailure)?.errorDescription
@@ -82,18 +129,21 @@ import ZenithKit
     }
   }
   func lock() {
+    guard !locking else { return }
+    locking=true
     generation += 1
     repository?.invalidatePendingWork()
-    unlockedAt = nil
-    Task { await repository?.lock(); wallet = try? await repository?.state() }
+    unlockTimer.clear()
+    Task { await repository?.lock(); wallet = try? await repository?.state();locking=false }
   }
   func expire() {
-    if let unlockedAt, Date().timeIntervalSince(unlockedAt) >= 300 { lock() }
+    let time=clock()
+    if unlockTimer.expired(unlockDuration,now:time.0,uptime:time.1) { lock() }
   }
 }
 
 struct TransferConsole: View {
-  @StateObject private var model = TransferModel()
+  @ObservedObject var model:TransferModel
   @State private var section = "resources"
   private let clock = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
   var body: some View {
@@ -105,9 +155,9 @@ struct TransferConsole: View {
         nav("Wallet", "wallet.pass", "wallet")
         nav("Transfer files", "qrcode", "files")
         Spacer()
-        Text(model.wallet?.unlocked == true ? "Transfer Wallet unlocked" : "Transfer Wallet locked")
+        Text(model.walletUnlocked ? "Transfer Wallet unlocked" : "Transfer Wallet locked")
           .font(.caption).foregroundStyle(.secondary)
-        if model.wallet?.unlocked == true { Button("Lock Wallet") { model.lock() } }
+        if model.walletUnlocked { Button("Lock Wallet") { model.lock() } }
       }.padding(20).frame(width: 210).frame(maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor))
       Divider()
@@ -121,10 +171,10 @@ struct TransferConsole: View {
       }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }.task { await model.refresh(); await model.discoverLocalResources() }
       .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+        model.expire()
         Task { await model.discoverLocalResources() }
       }
       .onReceive(clock) { _ in model.expire() }
-      .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in model.lock() }
       .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.lock() }
       .alert("Needs attention", isPresented: Binding(get: { model.error != nil },
         set: { if !$0 { model.error = nil } })) { Button("OK") { model.error = nil } }
@@ -141,15 +191,20 @@ struct TransferConsole: View {
 
 private struct TransferResourcesView: View {
   @ObservedObject var model: TransferModel
-  @State private var selected: String?
+  @State private var selected: TransferConnectionSelection?
   @State private var proposed: RegisteredResource?
   @State private var replacing: RegisteredResource?
   @State private var removing: RegisteredResource?
-  @State private var operatorResource: RegisteredResource?
-  @State private var ownerResource: LocalResource?
+  @State private var connectionScreen: TransferConnectionScreen?
+  @State private var ownerService: LocalService?
+  @State private var publicationService: LocalService?
   @State private var address = ""
-  private var current: RegisteredResource? { model.resources.first { $0.id == selected } }
-  private var currentLocal: LocalResource? { model.localResources.first { $0.id == selected } }
+  private var current: RegisteredResource? { selected?.savedResource(in: model.resources) }
+  private var currentLocal: LocalResource? { selected?.localResource(in: model.localResources) }
+  private var currentService: LocalService? { selected?.service(in:model.localServices) }
+  private var remainingResources: [LocalResource] {
+    model.localResources.filter { resource in !model.localServices.contains { $0.resource_id==resource.id && $0.endpoint==resource.endpoint } }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -174,19 +229,30 @@ private struct TransferResourcesView: View {
       HStack(alignment: .top, spacing: 24) {
         ScrollView {
           VStack(alignment: .leading, spacing: 10) {
-            Text("On this Mac").font(.headline)
-            if model.localResources.isEmpty {
+            Text("Services on this Mac").font(.headline)
+            ForEach(model.localServices) { service in
+              Button { selected = .service(service.id) } label: {
+                VStack(alignment:.leading,spacing:4) {
+                  Label(service.title,systemImage:service.interface == .walletAPI ? "person.badge.key" : "server.rack").font(.headline)
+                  Text(service.endpoint).font(.caption).foregroundStyle(.secondary)
+                  Text(model.localHealth["service:"+service.id]?.label ?? "Checking this endpoint…").font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth:.infinity,alignment:.leading).padding(12)
+                  .background(selected == .service(service.id) ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04)).cornerRadius(10)
+              }.buttonStyle(.plain)
+            }
+            if !remainingResources.isEmpty { Text("Configured resources").font(.headline) }
+            if model.localResources.isEmpty && model.localServices.isEmpty {
               Text(model.discovering ? "Checking the resource registry…" : "No local services registered").foregroundStyle(.secondary)
             }
-            ForEach(model.localResources) { resource in
-              Button { selected = resource.id } label: {
+            ForEach(remainingResources) { resource in
+              Button { selected = .local(resource.id) } label: {
                 VStack(alignment: .leading, spacing: 4) {
                   Label(resource.name, systemImage: "desktopcomputer").font(.headline)
                   Text(resource.endpoint).font(.caption).foregroundStyle(.secondary)
-                  Text(resource.connection == nil ? "Connection setup needed" : "Review connection settings")
+                  Text(model.localHealth["resource:"+resource.id]?.label ?? "Checking this endpoint…")
                     .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                  .background(selected == resource.id ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
+                  .background(selected == .local(resource.id) ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
                   .cornerRadius(10)
               }.buttonStyle(.plain)
             }
@@ -195,12 +261,12 @@ private struct TransferResourcesView: View {
             Text("Saved connections").font(.headline)
             if model.resources.isEmpty { Text("No saved connections").foregroundStyle(.secondary) }
             ForEach(model.resources) { resource in
-              Button { selected = resource.id } label: {
+              Button { selected = .saved(resource.id) } label: {
                 VStack(alignment: .leading, spacing: 4) {
                   Label(resource.configuration.name, systemImage: "server.rack").font(.headline)
                   Text(resource.id).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                  .background(selected == resource.id ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
+                  .background(selected == .saved(resource.id) ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
                   .cornerRadius(10)
               }.buttonStyle(.plain)
             }
@@ -215,10 +281,10 @@ private struct TransferResourcesView: View {
               Text("Review requests, choose permissions and resource paths, then approve grants with your Transfer Wallet.")
               Text("A selected container includes the resources beneath it at the time of access. Global access remains limited by the server's operator policy.")
                 .foregroundStyle(.secondary)
-              Button("Manage access in Transfer") { operatorResource = current }
+              Button("Manage access in Transfer") { connectionScreen = .access(current) }
                 .buttonStyle(TransferPrimaryButtonStyle())
                 .disabled(model.repository == nil)
-              if model.wallet?.unlocked != true {
+              if !model.walletUnlocked {
                 Text("You can unlock your Wallet inside access management. Set up your Wallet first if you haven’t imported one yet.").foregroundStyle(.secondary)
               }
               Text("Only a Wallet authorized by this service can manage its grants. Transfer signs your reviewed decisions and sends them directly to this server.")
@@ -231,25 +297,63 @@ private struct TransferResourcesView: View {
               Text("Removing a registration does not stop the service or revoke anyone's access.")
                 .font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading)
+          } else if let service=currentService {
+            VStack(alignment:.leading,spacing:16) {
+              Text(service.title).font(.title.bold())
+              Text(service.endpoint).textSelection(.enabled)
+              Text(model.localHealth["service:"+service.id]?.label ?? "Checking this endpoint…").font(.headline)
+              if model.localHealth["service:"+service.id]?.ownerRegistrationRequired == true {
+                Text("Set up your Wallet as this DevGraph’s owner to start managing access.").font(.title3)
+                Text("Unlock your Wallet, review administrator access, then register it. After setup, you can review requests and choose each credential’s permissions and resource paths here in Transfer.").foregroundStyle(.secondary)
+                Button("Set up owner Wallet") { ownerService = service }.buttonStyle(TransferPrimaryButtonStyle())
+                Label("One-time setup · This Mac only", systemImage: "desktopcomputer").font(.callout).foregroundStyle(.secondary)
+              } else if let configuration=service.connection,model.localHealth["service:"+service.id]?.walletAdministration == true {
+                if (try? LocalAdminRPC.discover(configuration: configuration)) != nil {
+                  Label("Local secS RPC · Signed Wallet commands", systemImage: "desktopcomputer").foregroundStyle(.secondary)
+                  Button("Manage credentials") {
+                    guard let value=selected?.accessResource(in:model.localServices,health:model.localHealth) else { model.error="This service changed. Refresh and select it again.";return }
+                    connectionScreen = .access(value)
+                  }.buttonStyle(TransferPrimaryButtonStyle())
+                  Text("Manage this DevGraph directly on this Mac. Its HTTPS service runs independently for remote clients.").foregroundStyle(.secondary)
+                } else {
+                  Button("Review this Wallet connection") {
+                    guard let value=selected?.accessResource(in:model.localServices,health:model.localHealth) else { model.error="This service changed. Refresh and select it again.";return }
+                    propose(value)
+                  }.buttonStyle(TransferPrimaryButtonStyle())
+                }
+                connection(configuration)
+              } else {
+                Text(service.interface == .privateAPI ? "This is the private API. It does not offer Wallet credential administration. Select a running Wallet API to provision credentials." : "Wallet administration is not verified at this endpoint. Refresh after starting the service or correcting its connection profile.")
+                  .foregroundStyle(.secondary)
+              }
+              DisclosureGroup("Service details") {
+                Text("Service ID: "+service.id).font(.caption.monospaced()).textSelection(.enabled)
+                Text("Graph ID: "+service.resource_id).font(.caption.monospaced()).textSelection(.enabled)
+                Text("This selection keeps this exact service, issuer and certificate. Other interfaces of the same graph are separate selections.").font(.caption).foregroundStyle(.secondary)
+              }
+              Divider()
+              Button("Sharing & network…", systemImage:"network") { publicationService=service }
+              Text("Review private Tailnet and public Funnel publishing for this exact local service. Network access does not grant credential permissions.").font(.caption).foregroundStyle(.secondary)
+              Text("Discovery checks public metadata only. Your Wallet identity and signed approvals are sent after you review and select a Wallet connection.").font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth:.infinity,alignment:.leading)
           } else if let local = currentLocal {
             VStack(alignment: .leading, spacing: 16) {
               Text(local.name).font(.title.bold())
-              Label("DevGraph · configured on this Mac", systemImage: "desktopcomputer")
+              Label("DevGraph · configured resource", systemImage: "desktopcomputer")
               Text(local.endpoint).textSelection(.enabled)
               Text("Resource ID: \(local.id)").font(.caption.monospaced()).textSelection(.enabled)
               Text("Discovered in ~/.zenith/resources/v1. This is public configuration, not proof that the service is running or that your Wallet owns it.")
                 .foregroundStyle(.secondary)
-              if let configuration = local.connection {
+              Text(model.localHealth["resource:"+local.id]?.label ?? "Checking this endpoint…").font(.headline)
+              if let configuration = local.connection,model.localHealth["resource:"+local.id]?.walletAdministration == true {
                 Button("Review connection") { do { propose(try RegisteredResource(configuration: configuration)) }
                   catch { model.error = "This service needs valid public connection settings." } }
                   .buttonStyle(TransferPrimaryButtonStyle())
                 connection(configuration)
               } else {
-                Text("Wallet connection setup needed").font(.headline)
-                Text("Choose the owner Wallet, permissions, resource paths and HTTPS connection here. Review the setup before installing any authority on this graph.")
+                Text("Wallet administration unavailable on this connection").font(.headline)
+                Text("This entry identifies the configured API. It does not launch or substitute another endpoint. Once a Wallet service is launched for this graph, select its separate entry under Services on this Mac.")
                   .foregroundStyle(.secondary)
-                Button("Set up owner & access") { ownerResource = local }.buttonStyle(TransferPrimaryButtonStyle())
-                Button("Import an existing Wallet connection") { importProfile() }
               }
               Text("Registration does not grant operator access or change certificate trust. The server checks your Wallet when you review requests.")
                 .font(.callout).foregroundStyle(.secondary)
@@ -267,11 +371,19 @@ private struct TransferResourcesView: View {
         }
       }.frame(maxHeight: .infinity)
     }.padding(24)
-      .onChange(of: model.localResources) { resources in if selected == nil { selected = resources.first?.id } }
-      .onAppear { if selected == nil { selected = model.localResources.first?.id } }
-      .sheet(item: $ownerResource) { value in TransferOwnerSetupView(resource: value, walletModel: model) }
-      .sheet(item: $operatorResource) { value in
-        if let repository = model.repository { TransferOperatorView(resource: value, repository: repository, walletModel: model) }
+      .sheet(item: $publicationService) { service in
+        TransferPublicationView(service:service).id(service.id)
+      }
+      .sheet(item: $ownerService) { service in
+        TransferServiceOwnerView(service: service, walletModel: model).id(service.id)
+      }
+      .sheet(item: $connectionScreen) { screen in
+        Group {
+          switch screen {
+          case .access(let resource):
+            if let repository = model.repository { TransferOperatorView(resource: resource, repository: repository, walletModel: model) }
+          }
+        }.id(screen.id)
       }
       .sheet(item: $proposed) { value in
         VStack(alignment: .leading, spacing: 16) {
@@ -291,7 +403,7 @@ private struct TransferResourcesView: View {
             Spacer()
             Button("Register resource") {
               model.register(value, replacing: replacing)
-              selected = value.id; proposed = nil
+              selected = .saved(value.id); proposed = nil
             }.buttonStyle(TransferPrimaryButtonStyle())
           }
         }.padding(24).frame(width: 600, height: 500)

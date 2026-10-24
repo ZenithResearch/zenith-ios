@@ -1,5 +1,18 @@
 import Foundation
 
+/// One automatic Touch ID prompt per app launch. Cancellation, failure and a
+/// deliberate manual lock must never cause an automatic prompt loop.
+public struct AutomaticBiometricUnlock: Sendable {
+  private var consumed = false
+  public init() {}
+  public mutating func claim(isPad: Bool, touchID: Bool, enabled: Bool, ready: Bool) -> Bool {
+    guard !consumed, isPad, touchID, enabled, ready else { return false }
+    consumed = true
+    return true
+  }
+  public mutating func suppress() { consumed = true }
+}
+
 public enum BiometricUnlockError: LocalizedError {
   case unavailable, cancelled, missing, storage
   public var errorDescription: String? {

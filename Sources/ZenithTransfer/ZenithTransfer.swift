@@ -6,10 +6,12 @@ import UniformTypeIdentifiers
 import ZenithKit
 
 @main
+@MainActor
 struct ZenithTransferApp: App {
+  @StateObject private var model=TransferModel()
   var body: some Scene {
     WindowGroup("Zenith Transfer") {
-      TransferConsole().frame(minWidth: 920, minHeight: 680)
+      TransferConsole(model:model).frame(minWidth: 920, minHeight: 680)
     }.defaultSize(width: 980, height: 780)
   }
 }

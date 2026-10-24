@@ -4,7 +4,7 @@ import Darwin
 import Foundation
 
 public enum OwnerSetupError: LocalizedError {
-  case unavailable, changed, invalid, emptyScope, walletLocked
+  case unavailable, changed, invalid, emptyScope, walletLocked, selectedConnectionUpgradeRequired
   public var errorDescription: String? {
     switch self {
     case .unavailable: return "Could not inspect this Mac’s configured DevGraph. Check that DevGraph is installed and running."
@@ -12,7 +12,32 @@ public enum OwnerSetupError: LocalizedError {
     case .invalid: return "Review the Wallet, HTTPS address, permissions and selected paths."
     case .emptyScope: return "Choose at least one Arena, Initiative or Project, or explicitly choose the entire graph."
     case .walletLocked: return "Unlock your Transfer Wallet to choose it as this graph’s owner."
+    case .selectedConnectionUpgradeRequired: return "Wallet administration is not available on this selected connection yet. The installed DevGraph needs matching Wallet administration support. Your connection has not been changed and no new listener has been selected."
     }
+  }
+}
+
+/// Owner registration inherits the selected resource's exact endpoint. It must
+/// never infer an IP/port or borrow another saved connection as a substitute.
+public struct OwnerRegistrationTarget: Equatable, Sendable {
+  public let resourceID: String
+  public let endpoint: String
+  public let name: String
+  public init(resource: LocalResource) {
+    resourceID = resource.id; endpoint = resource.endpoint; name = resource.name
+  }
+  public var needsInstalledWalletSupport: Bool {
+    // Current native credential transport requires HTTPS. The installed private
+    // HTTP API does not expose Wallet administration. Do not silently create a
+    // different listener or weaken transport validation to make setup proceed.
+    !OwnerSetupPlan.localWalletAddress(endpoint)
+  }
+  public func check(_ plan: OwnerSetupPlan) throws {
+    guard plan.resourceID == resourceID, plan.resourceName == name,
+      plan.localEndpoint == endpoint else { throw OwnerSetupError.changed }
+    if plan.schema == "zenith.devgraph-owner-setup.v3" {
+      try plan.validate()
+    } else if plan.walletEndpoint != endpoint { throw OwnerSetupError.changed }
   }
 }
 
@@ -92,8 +117,8 @@ public struct OwnerSetupPlan: Codable, Equatable, Sendable {
     ownerPublicKey: String, walletEndpoint: String, preset: OwnerPermissionPreset,
     writeOperations: [String], global: Bool, paths: [OwnerScopeNode], notBefore: UInt64,
     notAfter: UInt64?, publishHierarchy: Bool, readOperations: [String]? = nil,
-    presetSnapshot: CredentialPresetRevision? = nil) throws {
-    self.schema = readOperations != nil || presetSnapshot != nil ? "zenith.devgraph-owner-setup.v2" : "zenith.devgraph-owner-setup.v1"; self.status = "prepared_not_applied"
+    presetSnapshot: CredentialPresetRevision? = nil, walletAdminUpgrade: Bool = false) throws {
+    self.schema = walletAdminUpgrade ? "zenith.devgraph-owner-setup.v3" : (readOperations != nil || presetSnapshot != nil ? "zenith.devgraph-owner-setup.v2" : "zenith.devgraph-owner-setup.v1"); self.status = "prepared_not_applied"
     resourceID = resource.id; resourceName = resource.name; localEndpoint = resource.endpoint
     self.registrationSHA256 = registrationSHA256; self.configurationSHA256 = configurationSHA256
     self.ownerPublicKey = ownerPublicKey; self.walletEndpoint = walletEndpoint
@@ -103,6 +128,19 @@ public struct OwnerSetupPlan: Codable, Equatable, Sendable {
     scopeMode = global ? "global" : "paths"; self.paths = Self.normalized(paths)
     self.notBefore = notBefore; self.notAfter = notAfter; self.publishHierarchy = publishHierarchy
     try validate()
+  }
+  /// Local owner bootstrap is not a member credential. The owner can manage all
+  /// supported grant operations; recipient permissions are selected separately.
+  /// Retain v1/v2 decoding for previously saved, explicitly reviewed server plans.
+  public static func ownerBootstrap(resource: LocalResource, inspection: OwnerSetupInspection,
+    ownerPublicKey: String, walletEndpoint: String, now: UInt64, publishHierarchy: Bool = false) throws -> Self {
+    guard inspection.healthy, inspection.resource == resource else { throw OwnerSetupError.changed }
+    return try Self(resource: resource, registrationSHA256: inspection.registrationSHA256,
+      configurationSHA256: inspection.configurationSHA256, ownerPublicKey: ownerPublicKey,
+      walletEndpoint: walletEndpoint, preset: .projectManager,
+      writeOperations: OwnerPermissionPreset.allOperations, global: true, paths: [],
+      notBefore: now, notAfter: nil, publishHierarchy: publishHierarchy,
+      readOperations: CredentialPresetRevision.allReads)
   }
   public static func localWalletAddress(_ value: String) -> Bool {
     guard let url = try? WorkServerSettings.address(value), url.absoluteString == value,
@@ -119,9 +157,9 @@ public struct OwnerSetupPlan: Codable, Equatable, Sendable {
   }
   public func validate() throws {
     func hex(_ value: String) -> Bool { value.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil }
-    guard ["zenith.devgraph-owner-setup.v1", "zenith.devgraph-owner-setup.v2"].contains(schema), status == "prepared_not_applied",
+    guard ["zenith.devgraph-owner-setup.v1", "zenith.devgraph-owner-setup.v2", "zenith.devgraph-owner-setup.v3"].contains(schema), status == "prepared_not_applied",
       UUID(uuidString: resourceID)?.uuidString.lowercased() == resourceID,
-      !resourceName.isEmpty, resourceName.unicodeScalars.count <= 80, localEndpoint == "http://127.0.0.1:8080",
+      !resourceName.isEmpty, resourceName.unicodeScalars.count <= 80,
       hex(registrationSHA256), hex(configurationSHA256), hex(ownerPublicKey),
       scopeMode == "global" || scopeMode == "paths", paths.count <= 16,
       notBefore <= 9_007_199_254_740_991,
@@ -131,6 +169,14 @@ public struct OwnerSetupPlan: Codable, Equatable, Sendable {
       preset == .custom || writeOperations == preset.operations,
       Self.localWalletAddress(walletEndpoint)
     else { throw OwnerSetupError.invalid }
+    if schema == "zenith.devgraph-owner-setup.v3" {
+      guard let source = URLComponents(string:localEndpoint), source.scheme == "http", source.host == "127.0.0.1",
+        let port = source.port, (1024...65535).contains(port), localEndpoint == "http://127.0.0.1:\(port)",
+        URL(string:walletEndpoint)?.host == "127.0.0.1", preset == .projectManager,
+        scopeMode == "global", paths.isEmpty, notAfter == nil, !publishHierarchy, presetSnapshot == nil,
+        writeOperations == OwnerPermissionPreset.allOperations, readOperations == CredentialPresetRevision.allReads
+      else { throw OwnerSetupError.invalid }
+    } else if localEndpoint != "http://127.0.0.1:8080" { throw OwnerSetupError.invalid }
     if schema == "zenith.devgraph-owner-setup.v1" {
       guard readOperations == nil, presetSnapshot == nil else { throw OwnerSetupError.invalid }
     } else {
@@ -151,7 +197,7 @@ public struct OwnerSetupPlan: Codable, Equatable, Sendable {
     var reader = OwnerPlanJSON(data); try reader.validate()
     guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw OwnerSetupError.invalid }
     let required: Set<String> = ["schema", "resource_id", "resource_name", "local_endpoint", "registration_sha256", "configuration_sha256", "owner_public_key", "wallet_endpoint", "preset", "write_operations", "scope_mode", "paths", "not_before", "publish_hierarchy", "status"]
-    let v2 = raw["schema"] as? String == "zenith.devgraph-owner-setup.v2"
+    let v2 = ["zenith.devgraph-owner-setup.v2","zenith.devgraph-owner-setup.v3"].contains(raw["schema"] as? String ?? "")
     let allowed = required.union(v2 ? ["not_after", "read_operations", "preset_snapshot"] : ["not_after"])
     guard required.isSubset(of: Set(raw.keys)), Set(raw.keys).isSubset(of: allowed), !v2 || raw["read_operations"] != nil,
       let paths = raw["paths"] as? [[String: Any]], paths.allSatisfy({ Set($0.keys) == ["kind", "resource_id", "title", "path"] }) else { throw OwnerSetupError.invalid }
@@ -197,7 +243,6 @@ public struct OwnerSetupInspector: Sendable {
     return try handle.read(upToCount: maximum + 1) ?? Data()
   }
   public func inspect(_ selected: LocalResource) async throws -> OwnerSetupInspection {
-    guard selected.endpoint == "http://127.0.0.1:8080" else { throw OwnerSetupError.unavailable }
     let base = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Zenith/Devgraph")
     let registration = try Self.privateData(base.appendingPathComponent("resource-registration.json"))
     let current = try LocalResource.decode(registration)
@@ -205,7 +250,19 @@ public struct OwnerSetupInspector: Sendable {
       current.name == selected.name, current.connection == selected.connection else { throw OwnerSetupError.changed }
     let configuration = try Self.privateData(base.appendingPathComponent("local.json"))
     let raw = try await run(["local", "status"])
-    guard let status = try JSONSerialization.jsonObject(with: raw) as? [String: Any], status["healthy"] as? Bool == true else { throw OwnerSetupError.unavailable }
+    return try Self.verifiedInspection(selected, registration: registration, configuration: configuration, status: raw)
+  }
+  /// Verify the fixed CLI's actual reported endpoint against the selected
+  /// registration. Never treat a healthy different local server as this target.
+  static func verifiedInspection(_ selected: LocalResource, registration: Data,
+    configuration: Data, status raw: Data) throws -> OwnerSetupInspection {
+    let current = try LocalResource.decode(registration)
+    guard current == selected else { throw OwnerSetupError.changed }
+    guard let status = try JSONSerialization.jsonObject(with: raw) as? [String: Any],
+      status["healthy"] as? Bool == true else { throw OwnerSetupError.unavailable }
+    guard let api = status["api"] as? [String: Any],
+      let checks = api["api"] as? [String: Any], checks["base_url"] as? String == selected.endpoint
+    else { throw OwnerSetupError.changed }
     return OwnerSetupInspection(resource: current, registrationSHA256: OwnerSetupPlan.sha256(registration),
       configurationSHA256: OwnerSetupPlan.sha256(configuration), healthy: true)
   }
@@ -297,7 +354,11 @@ public final class OwnerSetupStore {
 /// Bounded integer-only JSON; decode escaped keys before duplicate detection.
 struct OwnerPlanJSON {
   let bytes: [UInt8]; var cursor = 0
-  init(_ data: Data) { bytes = Array(data) }
+  let maximumBytes: Int, maximumKeys: Int, maximumArray: Int, maximumDepth: Int
+  init(_ data: Data, maximumBytes: Int = 65536, maximumKeys: Int = 20, maximumArray: Int = 64, maximumDepth: Int = 8) {
+    bytes = Array(data); self.maximumBytes = maximumBytes; self.maximumKeys = maximumKeys
+    self.maximumArray = maximumArray; self.maximumDepth = maximumDepth
+  }
   mutating func space() { while cursor < bytes.count && [9,10,13,32].contains(bytes[cursor]) { cursor += 1 } }
   mutating func take(_ byte: UInt8) throws {
     space(); guard cursor < bytes.count, bytes[cursor] == byte else { throw OwnerSetupError.invalid }; cursor += 1
@@ -313,14 +374,14 @@ struct OwnerPlanJSON {
     throw OwnerSetupError.invalid
   }
   mutating func value(_ depth: Int) throws {
-    space(); guard depth <= 8, cursor < bytes.count else { throw OwnerSetupError.invalid }
+    space(); guard depth <= maximumDepth, cursor < bytes.count else { throw OwnerSetupError.invalid }
     switch bytes[cursor] {
     case 34: _ = try string()
     case 123:
       try take(123); space(); var keys: Set<String> = []
       if cursor < bytes.count && bytes[cursor] == 125 { cursor += 1; return }
       while true {
-        let key = try string(); guard keys.insert(key).inserted, keys.count <= 20 else { throw OwnerSetupError.invalid }
+        let key = try string(); guard keys.insert(key).inserted, keys.count <= maximumKeys else { throw OwnerSetupError.invalid }
         try take(58); try value(depth+1); space()
         guard cursor < bytes.count else { throw OwnerSetupError.invalid }
         if bytes[cursor] == 125 { cursor += 1; break }; try take(44)
@@ -329,7 +390,7 @@ struct OwnerPlanJSON {
       try take(91); space(); var count = 0
       if cursor < bytes.count && bytes[cursor] == 93 { cursor += 1; return }
       while true {
-        count += 1; guard count <= 64 else { throw OwnerSetupError.invalid }
+        count += 1; guard count <= maximumArray else { throw OwnerSetupError.invalid }
         try value(depth+1); space(); guard cursor < bytes.count else { throw OwnerSetupError.invalid }
         if bytes[cursor] == 93 { cursor += 1; break }; try take(44)
       }
@@ -344,7 +405,7 @@ struct OwnerPlanJSON {
     }
   }
   mutating func validate() throws {
-    guard !bytes.isEmpty, bytes.count <= 65536 else { throw OwnerSetupError.invalid }
+    guard !bytes.isEmpty, bytes.count <= maximumBytes else { throw OwnerSetupError.invalid }
     try value(0); space(); guard cursor == bytes.count else { throw OwnerSetupError.invalid }
   }
 }

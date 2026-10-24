@@ -30,6 +30,9 @@ extension TransferOperatorBridge {
   @Published var consent: OperatorConsent?
   @Published var failure: String?
   private var transport: PrivateTransport?
+  private var localRPC: LocalAdminRPC?
+  private var rpcExchange: ((String, Data) async throws -> PrivateHTTPResponse)?
+  var transportLabel: String { localRPC == nil && rpcExchange == nil ? "HTTPS · Wallet-authenticated" : "Local secS RPC · Wallet-authenticated" }
   private var journal: OperatorJournal?
   private var rawChallenge: Data?
   private var signed: Data?
@@ -46,11 +49,16 @@ extension TransferOperatorBridge {
   }()
 
   init(resource: RegisteredResource, repository: WalletRepository,
-    transport suppliedTransport: PrivateTransport? = nil, journalDirectory: URL? = nil) {
+    transport suppliedTransport: PrivateTransport? = nil, journalDirectory: URL? = nil,
+    rpcExchange: ((String, Data) async throws -> PrivateHTTPResponse)? = nil) {
     self.resource = resource; self.repository = repository
     super.init()
     do {
-      transport = try suppliedTransport ?? PrivateTransport(workServer: resource.configuration)
+      if let rpcExchange { self.rpcExchange = rpcExchange }
+      else if let suppliedTransport { transport = suppliedTransport }
+      else if let rpc = try? LocalAdminRPC.discover(configuration: resource.configuration) { localRPC = rpc }
+      else if resource.configuration.network == .local { localRPC = try LocalAdminRPC.discover(configuration: resource.configuration) }
+      else { transport = try PrivateTransport(workServer: resource.configuration) }
       let root = try FileManager.default.url(for: .applicationSupportDirectory,
         in: .userDomainMask, appropriateFor: nil, create: true)
       journal = try OperatorJournal(directory: journalDirectory ?? root.appendingPathComponent("ZenithTransfer/OperatorActions"), origin: resource.id)
@@ -185,7 +193,7 @@ extension TransferOperatorBridge {
     case "post":
       guard let path = args["path"] as? String,
         ["/devgraph/access-operator/v1/challenges","/devgraph/access-operator/v1/actions"].contains(path),
-        let text = args["body"] as? String, text.utf8.count <= 65_536, let transport else { throw WalletFailure.invalidFile }
+        let text = args["body"] as? String, text.utf8.count <= 65_536, transport != nil || localRPC != nil || rpcExchange != nil else { throw WalletFailure.invalidFile }
       let body = Data(text.utf8), input = try object(body)
       let actionCall = path.hasSuffix("/actions")
       if actionCall {
@@ -207,7 +215,11 @@ extension TransferOperatorBridge {
       }
       var request = URLRequest(url: URL(string: resource.id + path)!)
       request.httpMethod = "POST"; request.httpBody = body; request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      let response = try await transport.exchange(request)
+      let response: PrivateHTTPResponse
+      if let rpcExchange { response = try await rpcExchange(actionCall ? "execute" : "challenge", body) }
+      else if let localRPC { response = try await localRPC.call(operation: actionCall ? "execute" : "challenge", body: body) }
+      else if let transport { response = try await transport.exchange(request) }
+      else { throw LocalAdminRPCError.unavailable }
       if !actionCall && response.status == 200 {
         // Native validation sees the ORIGINAL raw JSON, rejecting duplicates
         // before the web renderer parses it. The human signs only later.

@@ -12,7 +12,7 @@ struct LANServerTrust: Sendable, Equatable {
 
   init(configuration: WorkAccessConfiguration) throws {
     try configuration.validate()
-    guard configuration.network == .lan, let host = configuration.receiver.host,
+    guard configuration.network == .lan || configuration.network == .local, let host = configuration.receiver.host,
       let fingerprint = configuration.tls_certificate_sha256
     else { throw WalletFailure.core("service_setup_required") }
     self.host = host.lowercased()

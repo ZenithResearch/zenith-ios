@@ -26,6 +26,10 @@ struct PreviewRows: View {
         }
       }
     }
+    if let section = preview.walletIdentities {
+      DisclosureGroup("Wallet identities (\(section.accounts.count))") { WalletIdentityReviewRows(section: section) }
+      if let count = preview.importedWalletIdentities { Text("This file imports \(count) identity record(s). Existing nonconflicting identities are preserved.").font(.footnote).foregroundStyle(.secondary) }
+    }
     if let accounts = preview.chainAccounts?.accounts {
       DisclosureGroup("Public accounts (\(accounts.count))") {
         ForEach(accounts) { account in
@@ -98,7 +102,7 @@ struct DataFileView: View {
               document = EncryptedFile(data: $0)
               exporting = true
             }
-          }.disabled(exportPassword.count < 12 || model.busy)
+          }.disabled(!WalletPasswordRules.permitsLocal(exportPassword) || model.busy)
         } header: {
           Text("Export")
         } footer: {
@@ -175,7 +179,7 @@ struct LegacyRecoveryView: View {
               preview = $0
             }
           }.buttonStyle(.borderedProminent).disabled(
-            key.isEmpty || password.count < 12 || model.busy)
+            key.isEmpty || !WalletPasswordRules.permitsLocal(password) || model.busy)
         }
       }
       Section { Feedback() }

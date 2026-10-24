@@ -21,19 +21,23 @@ import ZenithKit
   }
 }
 
-/// Shared native permission controls used by both the preset creator and owner setup.
+/// Native member-permission controls shared with the preset creator.
 struct TransferPermissionEditor: View {
   @Binding var reads: Set<String>
   @Binding var writes: Set<String>
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
-      Text("Read permissions").font(.headline)
-      HStack(spacing: 22) {
-        ForEach(CredentialPresetRevision.allReads, id: \.self) { operation in
-          Toggle(["list": "List work", "get": "Read details", "relationships": "Read relationships"][operation] ?? operation,
-            isOn: selected(operation, set: $reads))
+      Text("Work read permissions").font(.headline)
+      ForEach(WorkReadPermission.allCases, id: \.rawValue) { permission in
+        Toggle(isOn: selected(permission.rawValue, set: $reads)) {
+          VStack(alignment: .leading, spacing: 3) {
+            Text(permission.title)
+            Text(permission.explanation).font(.caption).foregroundStyle(.secondary)
+          }
         }
       }
+      Label(WorkReadPermission.arenaAvailability, systemImage: "info.circle")
+        .font(.caption).foregroundStyle(.secondary)
       Text("Write permissions").font(.headline)
       LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
         ForEach(OwnerPermissionPreset.allOperations, id: \.self) { operation in

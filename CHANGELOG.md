@@ -1,6 +1,65 @@
+## Native identity consistency — build 33
+
+- Keep legacy Matrix/Nostr application records read-only and preserve their files.
+- Route all new identity edits and reviewed legacy copying through Wallet identities.
+- Keep Tailscale configuration editable in application settings.
+- Reject stale legacy create/edit/delete operations in application save adapters.
+
+## Portable Wallet identities — unreleased
+
+- Pin shared public core0.3.0 at `054b372d686e2f8dba0ad8bbd166adbde9ebab38`.
+- Add core-owned Matrix/Nostr/GitHub/X public identity descriptors with reviewed
+  edits and explicit copying of legacy app records; preserve originals/Tailscale.
+- Read and review Castawayv2 before writing it, preserve v1 files and newer records
+  during old-file imports, and show existing derived crypto account addresses.
+- Cover descriptor bounds, conflicts, encryption, actual backup/restore and
+  lock/stale-revision behavior with native C ABI integration tests.
+
+## Wallet backup boundary — unreleased
+
+- Restrict Wallet navigation to data covered by implemented recovery or Castaway
+  backup paths. Show portable membership proofs instead of provider setup.
+- Move application account records, Network, provider setup and unlock settings
+  into Settings; preserve existing storage and exports.
+- Keep service access outside Wallet until database backup/restore coverage exists.
+
+## Native Wallet consistency — unreleased
+
+- Share the Wallet home, public account records, password visibility/Copy controls
+  and recovery-password reuse across macOS, iPad and iPhone.
+- Default automatic lock to one hour of inactivity, with 15-minute, four-hour and
+  until-lock-or-quit choices; preserve existing timeout preferences.
+- Keep unlock separate from every connection and signing review; expired input
+  cannot revive custody, and background refreshes cannot extend it.
+- Pin the native core to public Castalia `575895f70e4cbdc982b7c9271b468470271dbb0b`.
+
 # Changelog
 
 ## [Unreleased]
+
+### Changed
+
+- Align native iOS build 29 with public `ZenithResearch/castalia-wallet` revision `7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485` — use the same canonical Wallet source as Transfer build 33 and Chrome 0.0.2 while preserving the native ABI, encrypted custody and app identity.
+
+- Expose embedded Tailscale sign-in in iOS server setup before a connection file is available. Discover private servers through the selected network, retain that route when saving, and cancel stale discovery when the route or network changes.
+
+- Reconcile the credential-setting completion plan with build 16 and the unfinished production activation boundary — keep the native preset/scope editor as the deliverable and prevent isolated test results from replacing the real DevGraph acceptance gates.
+
+### Added
+
+- Replace the grant-selection web renderer with Transfer’s native Swift credential editor in build 16 — select action presets independently from explicit global or multiple inherited resource paths, review the exact grant, and preserve original-action recovery while onward delegation stays disabled.
+
+### Fixed
+
+- Give native resource, preset and owner actions an explicit contrasting button style and clarify delegation limits in build 15 — installed review found system-accent primary buttons rendered white on white.
+
+
+### Added
+
+- Add native owner permission setup and versioned credential recipes with shared Seat-type references in Transfer build 14 — separate permissions from resource scope, preserve exact reviewed snapshots and avoid treating saved setup plans as production authority.
+
+
+- Remove the optional machine-local membership resource from the checked-in project — make clean iPad builds work without distributing a local endpoint; align generated build metadata.
 
 - Resolve Cargo output for native framework packaging — allow clean builds on a scratch volume without assuming source-local artifacts.
 

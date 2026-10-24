@@ -11,6 +11,7 @@ public struct WalletState: Decodable, Sendable {
   public let backupEligible: Bool?
   public let graphAccessProtocol: String?
   public let operatorAccessProtocol: String?
+  public let resourceOwnerProtocol: String?
   public var canRequestWorkAccess: Bool {
     unlocked && (backupEligible ?? backupVerified) && graphAccessProtocol == "castalia.graph-access.v2"
   }
@@ -19,6 +20,7 @@ public struct WalletState: Decodable, Sendable {
     case backupEligible = "backup_eligible"
     case graphAccessProtocol = "graph_access_protocol"
     case operatorAccessProtocol = "operator_access_protocol"
+    case resourceOwnerProtocol = "resource_owner_protocol"
     case configured, unlocked, revision
     case publicKey = "public_key"
     case backupVerified = "backup_verified"
@@ -31,12 +33,16 @@ public struct RestorePreview: Decodable, Sendable {
   public let backupVerified: Bool
   public let profile: PortableProfile?
   public let chainAccounts: PublicAccounts?
+  public let walletIdentities: WalletIdentitySection?
+  public let importedWalletIdentities: Int?
   public let memberships: PortableSections?
   public let replacesProfile: Bool?
   public let replacedProofs: [String]?
   enum CodingKeys: String, CodingKey {
     case profile, memberships
     case chainAccounts = "chain_accounts"
+    case walletIdentities = "wallet_identities"
+    case importedWalletIdentities = "imported_wallet_identities"
     case replacesProfile = "replaces_profile"
     case replacedProofs = "replaced_proofs"
     case token
@@ -94,6 +100,13 @@ public actor WalletRepository {
     try lifecycle.withCurrent(ticket) {}
   }
   public nonisolated func invalidatePendingWork() { lifecycle.invalidate() }
+  /// Backgrounding cancels drafts and invalidates old proofs immediately, while
+  /// retaining the already-unlocked core in this process. No secret is persisted.
+  /// Foreground callers wait for this task before preparing fresh consent.
+  public nonisolated func pauseForBackground() -> Task<Void, Never> {
+    lifecycle.invalidate()
+    return Task { await self.cancel() }
+  }
   public init(directory: URL) throws {
     core = try NativeCore()
     store = try SnapshotStore(directory: directory)
@@ -276,7 +289,32 @@ public actor WalletRepository {
       try JSONSerialization.data(withJSONObject: $0)
     }
   }
+  public func walletIdentitySnapshot() throws -> WalletIdentitySnapshot {
+    try Task.checkCancellation()
+    let current = try state()
+    guard current.unlocked, let owner = current.publicKey else { throw WalletFailure.locked }
+    let identities = try WalletIdentitySection.decode(core.invoke(["operation": "wallet_identities"]))
+    guard identities.ownerMemberKey == owner else { throw WalletIdentityError.ownerChanged }
+    let accounts = try core.decode(["operation": "chain_accounts"], as: PublicAccounts.self)
+    return WalletIdentitySnapshot(section: identities, revision: current.revision, chainAccounts: accounts)
+  }
+  public func prepareWalletIdentities(_ identities: WalletIdentitySection, expectedRevision: UInt64) throws -> RestorePreview {
+    try Task.checkCancellation(); try identities.validate()
+    let ticket = lifecycle.ticket(), current = try state()
+    guard current.unlocked, current.publicKey == identities.ownerMemberKey else { throw WalletFailure.locked }
+    guard current.revision == expectedRevision else { throw WalletFailure.conflict }
+    let raw = try JSONSerialization.jsonObject(with: JSONEncoder().encode(identities))
+    return try prepare(["operation": "prepare_wallet_identities", "identities": raw, "expected_revision": expectedRevision], ticket: ticket)
+  }
   public func dataSummary() throws -> Data { try core.invoke(["operation": "data_summary"]) }
+  /// The portable membership payload, without installation/session state.
+  public func portableMembershipProofs() throws -> [PortableSections.Proof] {
+    struct Summary: Decodable {
+      struct Contents: Decodable { let sections: PortableSections }
+      let contents: Contents?
+    }
+    return try JSONDecoder().decode(Summary.self, from: dataSummary()).contents?.sections.proofs ?? []
+  }
   public func readAccessIdentity() throws -> Data {
     try core.invoke(["operation": "read_access_identity"])
   }
@@ -367,6 +405,27 @@ public actor WalletRepository {
     try checkLifecycle(ticket)
     return result
   }
+  #if os(macOS)
+  /// First-owner consent is a separate protocol and never a member credential.
+  public func prepareResourceOwner(_ challenge: Data, binding: ResourceOwnerBinding, now: UInt64) throws -> ResourceOwnerConsent {
+    try Task.checkCancellation()
+    let ticket = lifecycle.ticket()
+    guard try state().resourceOwnerProtocol == "zenith.resource-owner.v1",
+      let text = String(data: challenge, encoding: .utf8) else { throw WalletFailure.core("owner_update_required") }
+    let checked = try ResourceOwnerChallenge.decode(challenge, binding: binding, now: now)
+    guard try state().publicKey == checked.adminGrant.holderPublicKey else { throw OwnerSetupError.changed }
+    let result = try core.invoke(["operation":"prepare_resource_owner_v1", "challenge":text,
+      "binding":JSONSerialization.jsonObject(with:JSONEncoder().encode(binding)), "now":now])
+    let consent = try ResourceOwnerConsent.decode(result, challenge: checked, lifecycle: ticket)
+    try checkLifecycle(ticket); return consent
+  }
+  public func approveResourceOwner(_ consent: ResourceOwnerConsent, now: UInt64) throws -> Data {
+    try Task.checkCancellation(); try checkLifecycle(consent.lifecycle)
+    let result = try core.invoke(["operation":"approve_resource_owner_v1", "token":consent.token, "now":now])
+    try consent.challenge.validateProof(result)
+    try checkLifecycle(consent.lifecycle); return result
+  }
+  #endif
   /// Separate native operator capability. Never fall back to member consent.
   public func prepareOperatorAccess(_ challenge: Data, pin: ReadAuthorityPin, now: UInt64) throws -> OperatorConsent {
     let ticket = lifecycle.ticket()

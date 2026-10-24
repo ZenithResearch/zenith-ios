@@ -13,6 +13,8 @@ struct RestoreView: View {
   @State private var filePassword = ""
   @State private var password = ""
   @State private var confirmation = ""
+  @State private var reuseFilePassword = true
+  private var selectedPassword: String? { WalletPasswordRules.importPassword(file: filePassword, local: password, confirmation: confirmation, reuse: reuseFilePassword) }
   @State private var dataPassword = ""
   @State private var dataName = "Castaway data"
   @State private var addingData = false
@@ -91,14 +93,19 @@ struct RestoreView: View {
       }
   }
   private var passwordPage: some View {
-    WalletFlowPage(step: "Import · 3 of 4", title: "A password for this phone",
+    WalletFlowPage(step: "Import · 3 of 4", title: "Choose how to unlock here",
       detail: "Choose how to unlock the imported wallet here. Your original backup stays unchanged.",
-      buttonTitle: "Review wallet", enabled: password.count >= 12 && password == confirmation,
+      buttonTitle: "Review wallet", enabled: selectedPassword != nil,
       busy: model.busy, action: prepare) {
-        WalletPasswordField(title: "New wallet password", prompt: "At least 12 characters", text: $password, isNew: true)
-        WalletPasswordField(title: "Repeat wallet password", text: $confirmation, isNew: true)
-        Text(!confirmation.isEmpty && confirmation != password ? "The passwords don’t match yet." : "Use at least 12 characters.")
-          .font(.footnote).foregroundStyle(.secondary)
+        Toggle("Use the backup password to unlock here", isOn: $reuseFilePassword)
+        if reuseFilePassword {
+          Text("Your backup stays unchanged. This password will also unlock the encrypted Wallet copy on this device.").font(.footnote).foregroundStyle(.secondary)
+          if !WalletPasswordRules.permitsLocal(filePassword) { Text("This older backup password does not meet the current local password requirements. Choose a different password for this device.").font(.footnote) }
+        } else {
+          WalletPasswordField(title: "Local Wallet password", prompt: "At least 12 characters", text: $password, isNew: true)
+          WalletPasswordField(title: "Repeat local Wallet password", text: $confirmation, isNew: true)
+          Text(!confirmation.isEmpty && confirmation != password ? "The passwords don’t match yet." : "Use at least 12 characters.").font(.footnote).foregroundStyle(.secondary)
+        }
         Text("Next, we’ll check your backup and show the wallet before anything is imported.")
           .font(.footnote).foregroundStyle(.secondary)
         Feedback()
@@ -127,8 +134,8 @@ struct RestoreView: View {
     } catch { model.error = "That recovery file could not be read. Choose another backup." }
   }
   private func prepare() {
-    guard let file = model.recoverySelection else { return }
-    let fileSecret = filePassword, localSecret = password
+    guard let file = model.recoverySelection, let localSecret = selectedPassword else { return }
+    let fileSecret = filePassword
     let data = model.dataSelection, dataSecret = data == nil ? nil : dataPassword
     clearPasswords(); awaitingOperation = true
     model.perform({ try await $0.prepareRestore(file: file, filePassword: fileSecret,

@@ -200,7 +200,7 @@ struct TransferOperatorView: View {
     let bridge = TransferOperatorBridge(resource: resource, repository: repository)
     _bridge = StateObject(wrappedValue: bridge); _editor = StateObject(wrappedValue: NativeCredentialModel(bridge: bridge))
   }
-  var unlocked: Bool { walletModel.wallet?.unlocked == true }
+  var unlocked: Bool { walletModel.walletUnlocked }
   var editing: Bool { !editor.busy && editor.state == .idle }
   var body: some View {
     VStack(spacing: 0) {
@@ -217,6 +217,7 @@ struct TransferOperatorView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 20) {
           if let failure = bridge.failure { Text(failure).foregroundStyle(.red) }
+          Label(bridge.transportLabel, systemImage: "desktopcomputer").font(.caption).foregroundStyle(.secondary)
           Label(editor.status, systemImage: "key.horizontal").font(.callout)
           if let error = editor.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
           if !unlocked { Text("Unlock the Transfer Wallet to authenticate to this resource. Owner setup and credential creation are separate flows.").foregroundStyle(.secondary) }
@@ -234,7 +235,7 @@ struct TransferOperatorView: View {
         }.padding(24).frame(maxWidth: 940, alignment: .leading).frame(maxWidth: .infinity)
       }
     }.frame(minWidth: 980, minHeight: 720)
-      .onChange(of: walletModel.wallet?.unlocked) { value in if value != true { bridge.resolve(false) } }
+      .onChange(of: walletModel.walletUnlocked) { value in if !value { bridge.resolve(false) } }
       .onChange(of: editor.choice) { _ in if editor.state == .idle { editor.review = nil } }
       .sheet(isPresented: $unlocking) {
         VStack(spacing: 0) {
@@ -331,11 +332,19 @@ struct TransferOperatorView: View {
     VStack(alignment: .leading, spacing: 12) {
       if let notice = editor.recipeNotice { Text(notice).font(.callout).foregroundStyle(.secondary) }
       Text("Permissions carried by this credential").font(.headline)
-      Text("Read Work does not mean all Work. Choose its resource coverage below.").font(.callout).foregroundStyle(.secondary)
+      Text("Work read permissions").font(.subheadline.bold())
       ForEach(inbox.permissions.reads, id: \.self) { op in
-        Toggle(["list":"List work", "get":"Read details", "relationships":"Read relationships", "children":"Read children", "blockers":"Read blockers"][op] ?? op,
-          isOn: binding(op, reads: true))
+        Toggle(isOn: binding(op, reads: true)) {
+          VStack(alignment: .leading, spacing: 3) {
+            Text(WorkReadPermission(rawValue: op)?.title ?? ["children":"Read Work children", "blockers":"Read Work blockers"][op] ?? op)
+            if let permission = WorkReadPermission(rawValue: op) {
+              Text(permission.explanation).font(.caption).foregroundStyle(.secondary)
+            }
+          }
+        }
       }
+      Label(WorkReadPermission.arenaAvailability, systemImage: "info.circle")
+        .font(.caption).foregroundStyle(.secondary)
       let supported = OwnerPermissionPreset.allOperations.filter { inbox.permissions.writes.contains("devgraph.work." + $0 + ".v2") }
       if !supported.isEmpty {
         Text("Write permissions").font(.headline)

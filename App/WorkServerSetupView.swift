@@ -16,6 +16,7 @@ struct WorkServerSetupView: View {
   @State private var error: String?
   @State private var discovering = false
   @State private var discoveryTask: Task<Void,Never>?
+  @State private var discoveryID: UUID?
   @State private var nearby: [WorkServerInboxEntry] = []
 
   var body: some View {
@@ -29,9 +30,15 @@ struct WorkServerSetupView: View {
     .navigationTitle("Connect to work")
     .navigationBarTitleDisplayMode(.inline)
     .onAppear { draft.active = true }
-    .onDisappear { discoveryTask?.cancel(); if scene == .active { draft.active = false } }
+    .onDisappear { cancelDiscovery(); if scene == .active { draft.active = false } }
     .task { refreshFiles() }
-    .onChange(of: scene) { _, phase in if phase == .active { refreshFiles() } }
+    .onChange(of: scene) { _, phase in
+      if phase == .active { refreshFiles() } else { cancelDiscovery() }
+    }
+    .onChange(of: draft.discoverViaTailscale) { _, _ in cancelDiscovery(); error = nil }
+    .onChange(of: privateNetwork.generation) { _, _ in
+      if draft.discoverViaTailscale { cancelDiscovery() }
+    }
     .sheet(isPresented: $manual) {
       NavigationStack {
         ManualWorkServerView { select($0); manual = false }
@@ -59,10 +66,23 @@ struct WorkServerSetupView: View {
         }.padding(.vertical, 8)
       }
       Section {
+        Toggle("Use Tailscale", isOn: $draft.discoverViaTailscale)
+          .disabled(busy)
+          .accessibilityIdentifier("work.server.tailscale")
+        if draft.discoverViaTailscale {
+          PrivateNetworkRow(explanation: "Sign in to the Tailscale network that contains your DevGraph server, then enter its HTTPS address below.")
+            .disabled(busy)
+        } else {
+          Text("Connect directly using HTTPS.").font(.footnote).foregroundStyle(.secondary)
+        }
+      } header: { Text("Network") }
+      Section {
         TextField("https://your-work-server", text:$draft.address)
           .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
           .disabled(discovering || busy)
-        Button("Find server") { discover() }.disabled(discovering || busy || draft.address.isEmpty)
+        Button("Find server") { discover() }
+          .disabled(discovering || busy || draft.address.isEmpty
+            || (draft.discoverViaTailscale && privateNetwork.phase != .connected))
         if discovering { ProgressView("Finding server…") }
       } header: { Text("Server address") } footer: { Text("Enter the HTTPS address supplied by your administrator. You’ll review its verification details before saving or sharing your Wallet identity.") }
       if !nearby.isEmpty {
@@ -84,7 +104,7 @@ struct WorkServerSetupView: View {
                 .frame(minHeight: 54, alignment: .leading)
             }.accessibilityIdentifier("work.server.discovered")
           }
-        } header: { Text("Found on this iPhone") } footer: {
+        } header: { Text("Saved connection files") } footer: {
           Text("These connection files are already in Zenith’s folder. You’ll review the server before connecting.")
         }
       }
@@ -164,19 +184,36 @@ struct WorkServerSetupView: View {
     if busy { Section { ProgressView("Connecting…") } }
   }
   private func discover() {
-    discoveryTask?.cancel(); discovering = true; error = nil
+    cancelDiscovery(); discovering = true; error = nil
     let address = draft.address
+    let network: WorkNetwork? = draft.discoverViaTailscale ? .tailscale : nil
+    let ticket = UUID()
+    discoveryID = ticket
     discoveryTask = Task { @MainActor in
-      defer { discovering = false }
+      defer {
+        if discoveryID == ticket { discovering = false; discoveryID = nil; discoveryTask = nil }
+      }
       do {
-        let server = try await WorkServerDiscovery.discover(address)
-        guard !Task.isCancelled, draft.address == address, scene == .active else { return }
+        let transport = network == .tailscale ? privateNetwork.transport() : nil
+        let server = try await WorkServerDiscovery.discover(address, network: network, transport: transport)
+        guard !Task.isCancelled, discoveryID == ticket, draft.address == address, scene == .active else { return }
         select(server)
       } catch {
-        guard !Task.isCancelled else { return }
-        self.error = "Could not discover this server. Check its HTTPS address, or import a connection file from your administrator."
+        guard !Task.isCancelled, discoveryID == ticket else { return }
+        if let failure = error as? PrivateNetworkError { self.error = failure.localizedDescription }
+        else if let failure = error as? URLError {
+          self.error = WorkConnectionFailure(code: failure.code, network: network).localizedDescription
+        } else {
+          self.error = "Could not discover this server. Check its HTTPS address, or import a connection file from your administrator."
+        }
       }
     }
+  }
+  private func cancelDiscovery() {
+    discoveryTask?.cancel()
+    discoveryTask = nil
+    discoveryID = nil
+    discovering = false
   }
   private func refreshFiles() {
     guard let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }

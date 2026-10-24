@@ -6,10 +6,12 @@ import ZenithKit
 
 private final class NativeOperatorResponse: URLProtocol {
   static var handler: (([String: Any], String) throws -> [String: Any])?
+  static var observer: ((URLRequest) -> Void)?
   override class func canInit(with request: URLRequest) -> Bool { true }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
     do {
+      Self.observer?(request)
       var body = request.httpBody
       if body == nil, let stream = request.httpBodyStream {
         stream.open(); defer { stream.close() }; var data = Data(); var bytes = [UInt8](repeating: 0, count: 4096)
@@ -46,10 +48,26 @@ final class NativeOperatorClientTests: XCTestCase {
     client.bridge.resolve(true); return try await task.value
   }
   @MainActor func testNativeInboxReviewActivationAndOriginalRecoveryUseSameJournalAndWallet() async throws {
+    try await exerciseInboxRecovery(localRPC: false)
+  }
+  @MainActor func testLocalRPCUsesSameWalletReviewActivationAndOriginalRecoveryWithoutHTTP() async throws {
+    var httpCalls = 0
+    NativeOperatorResponse.observer = { _ in httpCalls += 1 }
+    defer { NativeOperatorResponse.observer = nil }
+    try await exerciseInboxRecovery(localRPC: true)
+    XCTAssertEqual(httpCalls, 0)
+  }
+  @MainActor private func exerciseInboxRecovery(localRPC: Bool) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root); NativeOperatorResponse.handler = nil }
     let (repo, resource, transport) = try await fixture(root), journals = root.appendingPathComponent("actions")
-    var bridge = TransferOperatorBridge(resource: resource, repository: repo, transport: transport, journalDirectory: journals)
+    let rpc: ((String, Data) async throws -> PrivateHTTPResponse)? = localRPC ? { operation, raw in
+      let path = operation == "challenge" ? "/devgraph/access-operator/v1/challenges" : "/devgraph/access-operator/v1/actions"
+      let value = try NativeOperatorResponse.handler!(GrantJSON.object(raw), path)
+      return PrivateHTTPResponse(status: 200, data: try GrantJSON.data(value))
+    } : nil
+    var bridge = TransferOperatorBridge(resource: resource, repository: repo, transport: localRPC ? nil : transport, journalDirectory: journals, rpcExchange: rpc)
+    XCTAssertEqual(bridge.transportLabel, localRPC ? "Local secS RPC · Wallet-authenticated" : "HTTPS · Wallet-authenticated")
     defer { bridge.cancel() }
     var client = try NativeOperatorClient(bridge: bridge)
     let ceiling: [String: Any] = ["schema":"devgraph.access-draft.v5", "issuer":"fixture", "receiver":resource.id, "lifetime_seconds":300, "validity":["schema":"castalia.grant-validity.v1", "mode":"until_revoked", "not_before":1], "read_grants":[["scope":"devgraph.work.read", "operations":["list","get"], "relationship_types":[], "work_kinds":["Task"], "include_archived":false]], "write_grants":[]]
@@ -101,7 +119,7 @@ final class NativeOperatorClientTests: XCTestCase {
     XCTAssertEqual(try journal.load(),retained)
     bridge.cancel()
     _ = try await repo.unlock(password:"Disposable native fixture password")
-    bridge = TransferOperatorBridge(resource:resource,repository:repo,transport:transport,journalDirectory:journals)
+    bridge = TransferOperatorBridge(resource:resource,repository:repo,transport:localRPC ? nil : transport,journalDirectory:journals,rpcExchange:rpc)
     client = try NativeOperatorClient(bridge:bridge)
     XCTAssertEqual(client.state,.unknown)
     try await client.prepareRecovery()
@@ -109,6 +127,37 @@ final class NativeOperatorClientTests: XCTestCase {
     XCTAssertEqual(recovered["status"] as? String,"active")
     XCTAssertEqual(decisions,1,"Status recovery never replays activation")
     XCTAssertEqual(actions,4); XCTAssertEqual(client.state,.idle); XCTAssertNil(try journal.load())
+  }
+  @MainActor func testNetworkPreparationUsesEachSelectedOriginAndIssuer() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root); NativeOperatorResponse.handler = nil; NativeOperatorResponse.observer = nil }
+    let (repo, first, transport) = try await fixture(root)
+    let second = try RegisteredResource(configuration: WorkAccessConfiguration(name: "Other graph",
+      receiver: URL(string: "https://other-graph.example")!, issuer: "other-issuer", keyID: "other-key",
+      publicKey: String(repeating: "34", count: 32)))
+    for selected in [first, second] {
+      let bridge = TransferOperatorBridge(resource: selected, repository: repo, transport: transport,
+        journalDirectory: root.appendingPathComponent("actions"))
+      defer { bridge.cancel() }
+      let client = try NativeOperatorClient(bridge: bridge)
+      var seen: [URL] = []
+      NativeOperatorResponse.observer = { request in
+        if let url = request.url { seen.append(url) }
+      }
+      NativeOperatorResponse.handler = { input, _ in
+        var challenge = self.challenge(input)
+        challenge["receiver"] = selected.configuration.origin
+        challenge["issuer"] = selected.configuration.issuer
+        return challenge
+      }
+      try await client.prepare(["action": "inbox"])
+      XCTAssertFalse(seen.isEmpty)
+      XCTAssertTrue(seen.allSatisfy { $0.scheme == selected.configuration.receiver.scheme && $0.host == selected.configuration.receiver.host && $0.port == selected.configuration.receiver.port })
+      XCTAssertEqual(client.challenge?["receiver"] as? String, selected.id)
+      XCTAssertEqual(client.challenge?["issuer"] as? String, selected.configuration.issuer)
+      XCTAssertEqual(bridge.resource.configuration.authority, selected.configuration.authority)
+      try await client.cancelPrepared()
+    }
   }
   @MainActor func testConcurrentPreparationAndTamperedChallengeCannotReplaceOriginal() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

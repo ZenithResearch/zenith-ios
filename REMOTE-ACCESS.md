@@ -1,11 +1,12 @@
-# Remote Work access — build 18
+# Remote Work access
 
-Work → Connection accepts an administrator-supplied HTTPS address. **Find server**
+Work → Connection offers **Use Tailscale** before entering an administrator-supplied HTTPS address. New setup drafts start with it enabled; **Connect Tailscale** explicitly starts sign-in. Once connected, **Find server** uses the embedded private transport and saves the reviewed profile with the Tailscale route. Turning the toggle off selects direct HTTPS. Changing routes or losing the private connection cancels pending discovery; a stale response cannot replace the selected server.
+
+**Find server**
 fetches only `/.well-known/devgraph-connection.json`, with no Wallet identity,
 proof or credential. A bounded, same-origin profile is displayed for explicit
 review before it is saved. Redirects, another receiver and secret-bearing profiles
-fail closed. Public HTTPS uses the normal system certificate checks; no Tailscale
-login or LAN certificate pin is added implicitly. File/manual/private setup
+fail closed. Both routes use the normal system certificate checks; no LAN certificate pin is added implicitly. File/manual/private setup
 remains supported and existing saved settings remain readable. Previewing a public
 server does not disconnect the shared Tailscale session used by Chat; the selected
 Work route still uses direct HTTPS and never falls back across networks.

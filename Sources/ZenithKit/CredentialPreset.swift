@@ -37,6 +37,27 @@ public struct PresetSeatAssociation: Codable, Equatable, Sendable {
   }
 }
 
+/// Presentation only. These remain the existing Work-read operations; no new
+/// authority is encoded by the labels or by selecting an Arena as a scope.
+public enum WorkReadPermission: String, CaseIterable, Sendable {
+  case list, get, relationships
+  public var title: String {
+    switch self {
+    case .list: return "List Work"
+    case .get: return "Read Work details"
+    case .relationships: return "Read Work relationships"
+    }
+  }
+  public var explanation: String {
+    switch self {
+    case .list: return "See permitted Work in the selected scope."
+    case .get: return "Open the details of permitted Work in the selected scope."
+    case .relationships: return "Read links between permitted Work. Related resources outside the scope stay inaccessible."
+    }
+  }
+  public static let arenaAvailability = "Read Arenas is not available in this credential format. Choosing an Arena as a scope limits Work access; it does not grant access to the Arena record itself."
+}
+
 /// An immutable permission recipe. Scope, holder, validity and server approval are separate.
 public struct CredentialPresetRevision: Codable, Equatable, Identifiable, Sendable {
   public let schema: String
