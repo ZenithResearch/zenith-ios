@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A73B19F8A1E14B8CAE910001 /* CastaliaCustody in Frameworks */ = {isa = PBXBuildFile; productRef = A73B19F8A1E14B8CAE910002 /* CastaliaCustody */; };
 		AD1F8B4A7B6F4C13A524E210 /* WalletIdentitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1F8B4A7B6F4C13A524E211 /* WalletIdentitiesView.swift */; };
 		04846B98E374EF8E24B77B22 /* HermesChatModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C76C2B4569D4805FDA76BBCD /* HermesChatModel.swift */; };
 		08F42E9ECE083976CEB8060E /* BackupWalletFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E561657CFECEF6B492A2D49C /* BackupWalletFlow.swift */; };
@@ -101,6 +102,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				587AD28F0C8B45EC534C1425 /* ZenithKit in Frameworks */,
+				A73B19F8A1E14B8CAE910001 /* CastaliaCustody in Frameworks */,
 				58458AC95679375C5492881B /* TailscaleKit.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -240,6 +242,7 @@
 			name = Zenith;
 			packageProductDependencies = (
 				77F0D4105983A0787AFCCF72 /* ZenithKit */,
+				A73B19F8A1E14B8CAE910002 /* CastaliaCustody */,
 			);
 			productName = Zenith;
 			productReference = 442D81CC67F7BEC92EA98E90 /* Zenith.app */;
@@ -540,6 +543,7 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A73B19F8A1E14B8CAE910002 /* CastaliaCustody */ = {isa = XCSwiftPackageProductDependency; productName = CastaliaCustody; };
 		77F0D4105983A0787AFCCF72 /* ZenithKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ZenithKit;

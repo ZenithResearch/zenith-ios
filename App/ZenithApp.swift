@@ -1,5 +1,6 @@
 import SwiftUI
 import ZenithKit
+import CastaliaCustody
 
 @main
 struct ZenithApp: App {
@@ -69,7 +70,7 @@ final class WalletModel: ObservableObject {
   @Published private(set) var workServer: WorkAccessConfiguration?
   private var workServerStore: WorkServerStore?
   private(set) var accessRequestStore: WorkAccessRequestStore?
-  private(set) var repository: WalletRepository?
+  private(set) var repository: (any WalletSession)?
   private var operation: Task<Void, Never>?
   private var backgrounded = false
   private var backgroundEpoch = 0
@@ -135,7 +136,7 @@ final class WalletModel: ObservableObject {
     }
   }
   func perform<T>(
-    _ action: @escaping (WalletRepository) async throws -> T, success: @escaping (T) -> Void
+    _ action: @escaping (any WalletSession) async throws -> T, success: @escaping (T) -> Void
   ) {
     guard !expire(), !busy, !paused, !obscured, let repository else { return }
     busy = true
