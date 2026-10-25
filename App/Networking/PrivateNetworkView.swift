@@ -34,13 +34,17 @@ struct PrivateNetworkRow: View {
         }
         Button("Cancel") { network.cancelSignIn() }
       } else {
-        Button("Connect Tailscale") {
+        Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("tailscale.enroll")
+        Text("Use a separate one-time, non-ephemeral key for each Zenith installation.")
+          .font(.footnote).foregroundStyle(.secondary)
+        Button("Use browser sign-in") {
           UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
           network.connect()
         }.accessibilityIdentifier("work.tailscale.connect")
       }
-      if network.phase != .connected && network.phase != .connecting
-        && network.phase != .awaitingApproval {
+      if network.phase == .signInRequired {
         Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
           .accessibilityIdentifier("tailscale.enroll")
       }
@@ -78,7 +82,7 @@ struct PrivateNetworkRow: View {
             Section {
               Button("Disconnect Tailscale") { network.disconnect(); managing = false }
             } footer: {
-              Text("Pauses this app’s connection. Your saved server settings stay on this iPhone. Remove this device in the Tailscale admin console to revoke its network membership.")
+              Text("Pauses this app’s connection. Your saved server settings stay on this device. Remove this device in the Tailscale admin console to revoke its network membership.")
             }
           }.navigationTitle("Private connection").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { managing = false } } }
@@ -115,10 +119,15 @@ private struct TailscaleEnrollmentView: View {
             .privacySensitive().accessibilityIdentifier("tailscale.authKey")
           Button("Choose auth key file", systemImage: "doc.badge.plus") { importing = true }
         } footer: {
-          Text("Use a one-time, non-ephemeral auth key from your Tailscale administrator. Work and Chat will share the saved device sign-in. This key is different from your Hermes gateway key.")
+          Text("Use a one-time, non-ephemeral auth key from your Tailscale administrator. Create a separate key for each device. Work and Chat share the saved device sign-in; normal reconnects use its saved device identity. This key is different from your Hermes gateway key.")
         }
         Section {
-          Button("Enroll this iPhone") {
+          Link("Create an auth key in Tailscale", destination: URL(string: "https://login.tailscale.com/admin/settings/keys")!)
+          Text("Choose Generate auth key with Reusable and Ephemeral off. Leave Tags unset for your personal device. Keep device approval enabled if your network uses it.")
+            .font(.footnote).foregroundStyle(.secondary)
+        }
+        Section {
+          Button("Enroll this device") {
             let value = key
             key = ""
             do {
@@ -137,7 +146,7 @@ private struct TailscaleEnrollmentView: View {
           }
           if let error { Text(error).foregroundStyle(.red) }
         } footer: {
-          Text("Zenith clears the entered key when you submit or leave this screen. Reconnects use the protected device identity saved on this iPhone. A transferred key file stays in Files until you remove it.")
+          Text("Zenith clears the entered key when you submit or leave this screen. Reconnects use the protected device identity saved on this device. A transferred key file stays in Files until you remove it.")
         }
       }.navigationTitle("Tailscale enrollment").navigationBarTitleDisplayMode(.inline)
         .toolbar {

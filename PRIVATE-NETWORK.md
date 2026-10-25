@@ -8,11 +8,11 @@ For a server on the same Wi-Fi, [Local network setup](LOCAL-NETWORK.md) provides
 
 The UX and lifecycle review selected one Connection picker and one status/action row:
 
-1. Open **Work → Connection** (also available through **Wallet → Work access**).
-2. **Use Tailscale** is available in the main setup screen, initially enabled for new setup drafts. Tap **Connect Tailscale** to sign in before entering a server address. After connection, **Find server** fetches the same-origin public verification settings through the embedded node and retains `network: "tailscale"` when saving. Turning the toggle off explicitly selects direct HTTPS. Alternatively, tap **Connect to [server]** for a validated profile already in Zenith’s Documents folder, or **Choose connection file**; manual entry stays separate.
-3. Sign in using the system browser and join the network supplied by the server administrator. Administrator device approval may still be required. Simply importing a file or choosing a route in the manual form does not start networking.
-4. Return to **Continue to read access**. The public pin remains reviewable under server verification details. Saving the server can fetch a scope preview, but never grants access.
-5. Approve the exact read scope. Missing membership leads to Membership setup first. Connection checks and saved network management remain available afterward.
+1. Open **Settings → Network**, or **Work → Connection** when choosing a server.
+2. **Sign in with an auth key** is the primary enrollment action. Generate a separate one-time, non-ephemeral key for each app installation. Leave Reusable and Ephemeral off; leave Tags unset for a personal device and retain device approval when enabled. The in-app enrollment sheet links to the official Keys page. A key's enrollment expiry does not itself disconnect an already registered device.
+3. Paste or import the key, then choose **Enroll this device**. The entered key is cleared on submission or leaving the screen. Normal reconnects use the saved node identity. Browser sign-in remains an explicit secondary action; key enrollment never silently falls back to it. Administrator device approval may still be required.
+4. For a server address, **Use Tailscale** remains available and initially enabled in new drafts. Once connected, **Find server** fetches same-origin public verification settings through the embedded node and retains `network: "tailscale"` when saving. Turning the toggle off explicitly selects direct HTTPS. Alternatively, choose a saved connection file. Selecting a file alone never starts enrollment.
+5. Review **Continue to read access** and the server verification details before saving. Request or check the operator's access decision, then review the provider-signed reusable grant before saving it in Wallet. Temporary read access remains available. Community membership is separate from graph access. Connection checks and saved network management remain available afterward.
 
 A network connection is not a successful server probe, issuer verification or read authorization. No public/private host, tailnet name, reusable auth key or operator key is bundled. The official public Tailscale control plane is the only supported control plane in this preview. Headscale/custom control planes and multiple simultaneous networks are outside this change.
 
