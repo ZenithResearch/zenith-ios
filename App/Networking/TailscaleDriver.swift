@@ -10,6 +10,11 @@ actor TailscaleDriver: PrivateNetworkDriver {
   private var controlSession: URLSession?
   private var interactiveLoginPending = false
 
+  func hasStoredState() async throws -> Bool {
+    let base = try FileManager.default.url(for: .applicationSupportDirectory,
+      in: .userDomainMask, appropriateFor: nil, create: false)
+    return try TailscaleSavedState.exists(in: base.appendingPathComponent("PrivateNetwork", isDirectory: true))
+  }
   func start(interactive: Bool) async throws {
     try await start(interactive: interactive, authKey: nil)
   }
@@ -18,6 +23,9 @@ actor TailscaleDriver: PrivateNetworkDriver {
   }
   private func start(interactive: Bool, authKey: String?) async throws {
     guard node == nil else { throw PrivateNetworkError.interrupted }
+    if !interactive && authKey == nil, !(try await hasStoredState()) {
+      throw PrivateNetworkError.savedIdentityUnavailable
+    }
     let base = try FileManager.default.url(for: .applicationSupportDirectory,
       in: .userDomainMask, appropriateFor: nil, create: true)
     var directory = base.appendingPathComponent("PrivateNetwork", isDirectory: true)

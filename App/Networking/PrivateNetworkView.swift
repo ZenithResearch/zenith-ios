@@ -34,15 +34,35 @@ struct PrivateNetworkRow: View {
         }
         Button("Cancel") { network.cancelSignIn() }
       } else {
-        Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
-          .buttonStyle(.borderedProminent)
-          .accessibilityIdentifier("tailscale.enroll")
+        if network.hasSavedConnection {
+          Button("Reconnect to Tailscale", systemImage: "arrow.clockwise") { network.reconnect() }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailscale.reconnect")
+          Text("Uses this installation’s saved device identity. No auth key is needed.")
+            .font(.footnote).foregroundStyle(.secondary)
+        }
+        if network.hasSavedConnection {
+          Button("Use an auth key instead", systemImage: "key") { enrolling = true }
+            .accessibilityIdentifier("tailscale.enroll")
+        } else {
+          Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailscale.enroll")
+        }
         Text("Use a separate one-time, non-ephemeral key for each Zenith installation.")
           .font(.footnote).foregroundStyle(.secondary)
         Button("Use browser sign-in") {
           UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
           network.connect()
         }.accessibilityIdentifier("work.tailscale.connect")
+      }
+      if network.hasSavedConnection {
+        Toggle("Reconnect automatically", isOn: Binding(
+          get: { network.automaticallyReconnect },
+          set: { network.setAutomaticallyReconnect($0) }))
+          .accessibilityIdentifier("tailscale.reconnectAutomatically")
+        Text("Restores this app’s private connection on launch and when you return. Disconnect pauses automatic reconnection until you choose Reconnect.")
+          .font(.footnote).foregroundStyle(.secondary)
       }
       if network.phase == .signInRequired {
         Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
@@ -78,11 +98,16 @@ struct PrivateNetworkRow: View {
               Label("Private network connected", systemImage: "checkmark.shield")
               if let name = network.networkName { LabeledContent("Network", value: name) }
               Text("Work and Chat share this private connection inside Zenith. Other apps use their own connections.")
+              Toggle("Reconnect automatically", isOn: Binding(
+                get: { network.automaticallyReconnect },
+                set: { network.setAutomaticallyReconnect($0) }))
+              Text("The device sign-in stays saved when the app closes. iOS pauses this embedded connection in the background; Zenith restores it when you return.")
+                .font(.footnote).foregroundStyle(.secondary)
             }
             Section {
               Button("Disconnect Tailscale") { network.disconnect(); managing = false }
             } footer: {
-              Text("Pauses this app’s connection. Your saved server settings stay on this device. Remove this device in the Tailscale admin console to revoke its network membership.")
+              Text("Pauses this app’s connection and keeps it disconnected across launches until you choose Reconnect. The saved device identity and server settings stay on this device. Remove this device in the Tailscale admin console to revoke its network membership.")
             }
           }.navigationTitle("Private connection").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { managing = false } } }
