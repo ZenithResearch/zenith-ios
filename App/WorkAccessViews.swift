@@ -52,6 +52,7 @@ struct WorkAccessView: View {
               LabeledContent("Provider", value: proposal.issuer)
               Text(proposal.receiver).foregroundStyle(.secondary)
               Text("Read permitted work. This cannot create, change or delete anything.")
+              Text(proposal.membershipRequirement.disclosure).font(.footnote)
               LabeledContent("Read credential expires", value: proposal.expires.formatted())
               Text(
                 "You can obtain a new read credential while your operator-approved grant remains active. No new operator decision is needed."
@@ -181,7 +182,7 @@ struct WorkAccessView: View {
             }
           }
           Section {
-            Button("Membership (optional)") { membershipSetup = true }
+            Button(model.state?.membershipActive == true ? "Community membership · Active" : "Community membership") { membershipSetup = true }
               .accessibilityIdentifier("work.membership.open")
             Button("Change connection") { changingServer = true }.disabled(model.busy)
             Button("Remove server", role: .destructive) {
@@ -193,8 +194,15 @@ struct WorkAccessView: View {
               "Removes this device’s server settings and read access. Your wallet and server data stay intact."
             )
           }
-          Section { Feedback() }
         }.navigationTitle("Work access")
+          .safeAreaInset(edge: .bottom) {
+            if model.error != nil || model.notice != nil || model.busy {
+              VStack(alignment: .leading, spacing: 8) { Feedback() }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding().background(.regularMaterial)
+                .accessibilityIdentifier("work.access.feedback")
+            }
+          }
       } else {
         WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
           continueSetup = true

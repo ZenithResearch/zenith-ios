@@ -23,6 +23,7 @@ struct WorkAccessRequestSection: View {
           if preference.resource_paths?.isEmpty != false { Text("No path restriction requested · Operator chooses the exact scope") }
         }
         Text("Your Wallet sends proof of identity and this request. The operator chooses the permissions; this step grants no access.")
+        Text(consent.membershipRequirement.disclosure).font(.footnote)
         LabeledContent("Approval expires",value:consent.approvalExpires.formatted())
         Button(consent.checkingStatus ? "Check request status" : "Send access request") {
           self.consent = nil
