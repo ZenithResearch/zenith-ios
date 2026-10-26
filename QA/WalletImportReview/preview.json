@@ -1,0 +1,114 @@
+{
+  "token": "synthetic-review-only",
+  "expected_revision": 1,
+  "public_key": "1111111111111111111111111111111111111111111111111111111111111111",
+  "backup_verified": true,
+  "chain_accounts": {
+    "accounts": [
+      {
+        "accountId": "fixture-0",
+        "networkId": "cardano:mainnet",
+        "address": "addr1_public_fixture"
+      },
+      {
+        "accountId": "fixture-1",
+        "networkId": "eip155:1",
+        "address": "0x1111111111111111111111111111111111111111"
+      },
+      {
+        "accountId": "fixture-2",
+        "networkId": "eip155:4663",
+        "address": "0x1111111111111111111111111111111111111111"
+      },
+      {
+        "accountId": "fixture-3",
+        "networkId": "solana:mainnet-beta",
+        "address": "PublicFixtureAddress"
+      }
+    ]
+  },
+  "wallet_identities": {
+    "schema": "castalia.wallet-identities.v1",
+    "version": 1,
+    "ownerMemberKey": "1111111111111111111111111111111111111111111111111111111111111111",
+    "authority": "descriptor-only",
+    "accounts": [
+      {
+        "accountId": "018d0000-0000-4000-8000-000000000001",
+        "kind": "matrix",
+        "label": "Chat",
+        "identifier": "@alice:example.test",
+        "server": "https://matrix.example.test"
+      },
+      {
+        "accountId": "018d0000-0000-4000-8000-000000000002",
+        "kind": "nostr",
+        "label": "Public identity",
+        "identifier": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "server": "wss://relay.example.test"
+      },
+      {
+        "accountId": "018d0000-0000-4000-8000-000000000003",
+        "kind": "github",
+        "label": "Gallery",
+        "identifier": "1234567",
+        "server": ""
+      },
+      {
+        "accountId": "018d0000-0000-4000-8000-000000000004",
+        "kind": "x",
+        "label": "Social",
+        "identifier": "2345678",
+        "server": ""
+      }
+    ]
+  },
+  "imported_wallet_identities": 4,
+  "profile": {
+    "subject": {
+      "memberKey": "1111111111111111111111111111111111111111111111111111111111111111",
+      "fields": {
+        "displayName": {
+          "value": "Synthetic profile",
+          "disclosure": "private"
+        }
+      }
+    }
+  },
+  "memberships": {
+    "memberships": [
+      {
+        "membershipId": "example-proof",
+        "issuerId": "example-issuer"
+      }
+    ],
+    "chainAccounts": {
+      "accounts": [
+        {
+          "accountId": "fixture-0",
+          "networkId": "cardano:mainnet",
+          "address": "addr1_public_fixture"
+        },
+        {
+          "accountId": "fixture-1",
+          "networkId": "eip155:1",
+          "address": "0x1111111111111111111111111111111111111111"
+        },
+        {
+          "accountId": "fixture-2",
+          "networkId": "eip155:4663",
+          "address": "0x1111111111111111111111111111111111111111"
+        },
+        {
+          "accountId": "fixture-3",
+          "networkId": "solana:mainnet-beta",
+          "address": "PublicFixtureAddress"
+        }
+      ]
+    }
+  },
+  "replaces_profile": true,
+  "replaced_proofs": [
+    "example-proof"
+  ]
+}

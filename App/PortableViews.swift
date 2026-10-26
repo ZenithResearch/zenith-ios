@@ -2,51 +2,14 @@ import SwiftUI
 import ZenithKit
 
 struct PreviewRows: View {
-  let preview: RestorePreview
-  var body: some View {
-    LabeledContent(
-      "Recovery", value: preview.backupVerified ? "File checked" : "Check a saved file next")
-    if let name = preview.profile?.subject.fields["displayName"]?.value, !name.isEmpty {
-      LabeledContent("Profile", value: name)
-    }
-    if preview.replacesProfile == true { Text("Your saved profile will be replaced.") }
-    if let ids = preview.replacedProofs, !ids.isEmpty {
-      Text("\(ids.count) membership proof(s) will be replaced. Other saved proofs are kept.")
-    }
-    DisclosureGroup("Wallet details") {
-      Text(preview.publicKey).font(.caption.monospaced()).textSelection(.enabled)
-    }
-    if let proofs = preview.memberships?.proofs, !proofs.isEmpty {
-      DisclosureGroup("Membership proofs (\(proofs.count))") {
-        ForEach(proofs) { proof in
-          VStack(alignment: .leading) {
-            Text(proof.issuerId)
-            Text(proof.membershipId).font(.caption.monospaced())
-          }
-        }
-      }
-    }
-    if let section = preview.walletIdentities {
-      DisclosureGroup("Wallet identities (\(section.accounts.count))") { WalletIdentityReviewRows(section: section) }
-      if let count = preview.importedWalletIdentities { Text("This file imports \(count) identity record(s). Existing nonconflicting identities are preserved.").font(.footnote).foregroundStyle(.secondary) }
-    }
-    if let accounts = preview.chainAccounts?.accounts {
-      DisclosureGroup("Public accounts (\(accounts.count))") {
-        ForEach(accounts) { account in
-          VStack(alignment: .leading) {
-            Text(account.networkId)
-            Text(account.address).font(.caption.monospaced())
-          }
-        }
-      }
-    }
-  }
+  let review: WalletImportReview
+  var body: some View { WalletImportReviewContent(review: review) }
 }
 struct DataFileView: View {
   @EnvironmentObject private var model: WalletModel
   @State private var selecting = false
   @State private var password = ""
-  @State private var preview: RestorePreview?
+  @State private var preview: WalletImportReview?
   @State private var exporting = false
   @State private var document: EncryptedFile?
   @State private var exportPassword = ""
@@ -54,17 +17,17 @@ struct DataFileView: View {
     Form {
       Section {
         Text(
-          "A data file contains your profile, membership proofs and public accounts. It cannot restore your signing identity or connect work."
+          "A Castaway data file contains your profile, membership proofs, saved account identities and public account descriptors. It cannot restore your signing identity or connect work."
         )
       }
       if let preview {
         Section("Review import") {
-          PreviewRows(preview: preview)
+          PreviewRows(review: preview)
           Text("Your active membership stays unchanged. Nothing will be published.")
         }
         Section {
           Button("Import data") {
-            model.perform({ try await $0.commit(preview) }) { _ in
+            model.perform({ try await $0.commit(preview.preview) }) { _ in
               self.preview = nil
               model.dataSelection = nil
               model.notice = "Data saved to your wallet."
@@ -87,9 +50,10 @@ struct DataFileView: View {
             Button("Review data") {
               let secret = password
               password = ""
-              model.perform({ try await $0.prepareData(file: selected, password: secret) }) {
-                preview = $0
-              }
+              model.perform({ repository in
+                let context = try WalletImportReview.Context.dataFile(selected, recovering: false)
+                return WalletImportReview(preview: try await repository.prepareData(file: selected, password: secret), context: context)
+              }) { preview = $0 }
             }.buttonStyle(.borderedProminent).disabled(password.isEmpty || model.busy)
           }
         }
@@ -133,7 +97,11 @@ struct DataFileView: View {
         preview = nil
         document = nil
       }
+      .onChange(of: model.dataSelection) { _, _ in
+        if preview != nil { preview = nil; model.cancel() }
+      }
       .onDisappear {
+        preview = nil
         password = ""
         exportPassword = ""
         model.cancel()
@@ -144,7 +112,7 @@ struct LegacyRecoveryView: View {
   @EnvironmentObject private var model: WalletModel
   @State private var key = ""
   @State private var password = ""
-  @State private var preview: RestorePreview?
+  @State private var preview: WalletImportReview?
   var body: some View {
     Form {
       Section {
@@ -154,9 +122,9 @@ struct LegacyRecoveryView: View {
       }
       if let preview {
         Section {
-          PreviewRows(preview: preview)
+          PreviewRows(review: preview)
           Button("Import wallet") {
-            model.perform({ try await $0.commit(preview) }) { _ in
+            model.perform({ try await $0.commit(preview.preview) }) { _ in
               model.notice = "Wallet imported. Save and check a recovery file next."
             }
           }.buttonStyle(.borderedProminent).disabled(model.busy)
@@ -176,7 +144,7 @@ struct LegacyRecoveryView: View {
             key = ""
             password = ""
             model.perform({ try await $0.prepareLegacy(key: old, password: secret) }) {
-              preview = $0
+              preview = WalletImportReview(preview: $0, context: .olderRecoveryKey)
             }
           }.buttonStyle(.borderedProminent).disabled(
             key.isEmpty || !WalletPasswordRules.permitsLocal(password) || model.busy)
@@ -190,6 +158,7 @@ struct LegacyRecoveryView: View {
         preview = nil
       }
       .onDisappear {
+        preview = nil
         key = ""
         password = ""
         model.cancel()
