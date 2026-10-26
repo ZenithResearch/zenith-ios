@@ -74,7 +74,7 @@ struct WorkAccessView: View {
                 "You can obtain a new read credential while your operator-approved grant remains active. No new operator decision is needed."
               ).font(.footnote)
               ForEach(Array(proposal.grants.enumerated()), id: \.offset) { _, grant in
-                Text(grant.work_kinds.joined(separator: ", "))
+                Text(grant.isArena ? "Arena records · names and details" : grant.work_kinds.joined(separator: ", "))
                 Text("Actions: " + grant.operations.joined(separator: ", "))
                 if grant.operations.contains("relationships") {
                   Text("Related work: " + grant.relationship_types.joined(separator: ", "))
@@ -86,15 +86,18 @@ struct WorkAccessView: View {
                   ).font(.footnote)
                 }
                 if let arenas = grant.arena_ids {
-                  Text("Arenas: " + arenas.joined(separator: ", "))
+                  Text((grant.isArena ? "Only Arena records: " : "Work in Arenas: ") + arenas.joined(separator: ", "))
                 } else if grant.resource_paths == nil {
                   Text("All arenas")
                 }
                 if let ids = grant.work_ids {
                   Text("Selected items: " + ids.joined(separator: ", "))
                 }
-                Text(
-                  grant.include_archived ? "Includes archived work" : "Archived work is excluded")
+                if grant.isArena {
+                  Text("Arena metadata does not grant access to its Work.").font(.footnote)
+                } else {
+                  Text(grant.include_archived ? "Includes archived work" : "Archived work is excluded")
+                }
               }
             }
             Section {
@@ -302,6 +305,7 @@ struct NativeWorkView: View {
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @State private var client: DevgraphReadClient?
   @State private var rows: [WorkRecord] = []
+  @State private var hasArenas = false
   @State private var cursors: [String: WorkPageCursor] = [:]
   @State private var finished: Set<String> = []
   @State private var allowed: [String] = []
@@ -322,7 +326,12 @@ struct NativeWorkView: View {
   var body: some View {
     NavigationStack {
       List {
-        if rows.isEmpty && !loading {
+        if hasArenas {
+          NavigationLink { NativeArenaListView() } label: {
+            Label("Shared Arenas", systemImage: "square.stack.3d.up")
+          }
+        }
+        if rows.isEmpty && !loading && !hasArenas {
           if let error {
             Text(error)
           } else {
@@ -377,35 +386,7 @@ struct NativeWorkView: View {
             }.navigationTitle("Filters").toolbar { Button("Done") { filters = false } }
           }
         }
-        .task(id: model.generation) {
-          client?.cancel()
-          rows = []
-          cursors = [:]
-          finished = []
-          allowed = []
-          detailKinds = []
-          error = nil
-          client = await workClient(model)
-          loading = false
-          let version = model.generation
-          do {
-            if let manifest = try await client?.manifest() {
-              guard !Task.isCancelled, version == model.generation else { return }
-              detailKinds = Set(
-                manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
-              allowed = Array(
-                Set(
-                  manifest.read_grants.filter { $0.operations.contains("list") }.flatMap(
-                    \.work_kinds))
-              ).sorted()
-              if !allowed.contains(kind) { kind = "All types" }
-              if rows.isEmpty { await loadMore() }
-            }
-          } catch {
-            guard !Task.isCancelled, version == model.generation else { return }
-            self.error = "Work access needs setup or has expired. Open Work access in Wallet."
-          }
-        }
+        .task(id: model.generation) { await reload() }
     }
     .onChange(of: privateNetwork.phase) { _, phase in
       if phase == .connected, model.workServer?.network == .tailscale {
@@ -423,6 +404,39 @@ struct NativeWorkView: View {
       }
     }
     .onDisappear { client?.cancel() }
+  }
+  private func reload() async {
+    client?.cancel()
+    rows = []
+    cursors = [:]
+    finished = []
+    allowed = []
+    detailKinds = []
+    hasArenas = false
+    error = nil
+    client = await workClient(model)
+    loading = false
+    let version = model.generation
+    do {
+      if let manifest = try await client?.manifest() {
+        guard !Task.isCancelled, version == model.generation else { return }
+        configurePermissions(manifest)
+        if !allowed.contains(kind) { kind = "All types" }
+        if rows.isEmpty { await loadMore() }
+      }
+    } catch {
+      guard !Task.isCancelled, version == model.generation else { return }
+      self.error = "Work access needs setup or has expired. Open Work access in Wallet."
+    }
+
+  }
+  private func configurePermissions(_ manifest: NativeReadManifest) {
+    let grants: [WorkReadGrant] = manifest.read_grants
+    hasArenas = grants.contains { grant in grant.isArena && grant.operations.contains("list") }
+    let detail: [String] = grants.filter { $0.operations.contains("get") }.flatMap { $0.work_kinds }
+    let listed: [String] = grants.filter { $0.operations.contains("list") }.flatMap { $0.work_kinds }
+    detailKinds = Set(detail)
+    allowed = Array(Set(listed)).sorted()
   }
   private func loadMore() async {
     guard !loading, let client else { return }
@@ -632,5 +646,101 @@ struct NativeRelatedWorkView: View {
       }
       self.error = error.localizedDescription
     }
+  }
+}
+
+/// Shared Arena metadata is displayed separately from the Work it may contain.
+struct NativeArenaListView: View {
+  @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
+  @State private var client: DevgraphReadClient?
+  @State private var rows: [ArenaRecord] = []
+  @State private var after: String?
+  @State private var loading = false
+  @State private var finished = false
+  @State private var error: String?
+  @State private var detailIDs: Set<String> = []
+  var body: some View {
+    List {
+      Section {
+        Text("Only explicitly shared Arena records appear here. Work requires its own permission.").font(.footnote)
+        ForEach(rows) { row in
+          if detailIDs.contains(row.id) {
+            NavigationLink(row.title) {
+              NativeArenaDetailView(id: row.id)
+            }
+          } else { Text(row.title) }
+        }
+      }
+      if loading { ProgressView("Loading Arenas") }
+      if let error { Text(error) }
+      if !loading && !finished && error == nil {
+        Button("Load more") { Task { await load() } }
+      }
+    }.navigationTitle("Shared Arenas")
+      .task(id: model.generation) {
+        client?.cancel(); client = await workClient(model)
+        rows = []; after = nil; finished = false; error = nil; loading = false
+        await load()
+      }
+      .onChange(of: privateNetwork.generation) { _, _ in
+        if model.workServer?.network == .tailscale {
+          client?.cancel(); rows = []; error = "Private connection changed. Return to Work and reconnect."
+        }
+      }
+      .onDisappear { client?.cancel() }
+  }
+  private func load() async {
+    guard !loading, !finished, let client else { return }
+    loading = true; error = nil
+    let generation = model.generation, network = privateNetwork.generation
+    func current() -> Bool { generation == model.generation && (client.connection.network != .tailscale || network == privateNetwork.generation) && !Task.isCancelled }
+    defer { if current() { loading = false } }
+    do {
+      let manifest = try await client.manifest()
+      let page = try await client.arenas(after: after)
+      guard current() else { return }
+      let existing = Set(rows.map(\.id))
+      guard page.items.allSatisfy({ !existing.contains($0.id) }) else { throw WalletFailure.core("invalid_response") }
+      detailIDs = Set(manifest.read_grants.filter { $0.isArena && $0.operations.contains("get") }.flatMap { $0.arena_ids ?? [] })
+      rows += page.items; after = page.next; finished = page.next == nil
+    } catch {
+      guard current() else { return }
+      if invalidatesWorkAccess(error) { rows = []; finished = true }
+      self.error = error.localizedDescription
+    }
+  }
+}
+struct NativeArenaDetailView: View {
+  let id: String
+  @EnvironmentObject private var model: WalletModel
+  @EnvironmentObject private var privateNetwork: PrivateNetworkModel
+  @State private var client: DevgraphReadClient?
+  @State private var row: ArenaRecord?
+  @State private var error: String?
+  var body: some View {
+    Form {
+      if let row {
+        Text(row.title).font(.headline)
+        Text(row.description)
+        Text("Arena · revision \(row.version)").font(.caption)
+      } else if let error { Text(error) } else { ProgressView("Loading Arena") }
+    }.navigationTitle("Arena")
+      .task(id: model.generation) {
+        client?.cancel(); row = nil; error = nil
+        guard let connection = await workClient(model) else { error = "Work access needs setup."; return }
+        client = connection
+        let generation = model.generation, network = privateNetwork.generation
+        do {
+          let value = try await connection.arena(id: id)
+          guard !Task.isCancelled, generation == model.generation,
+            connection.connection.network != .tailscale || network == privateNetwork.generation else { return }
+          row = value
+        } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+      }
+      .onChange(of: privateNetwork.generation) { _, _ in
+        if model.workServer?.network == .tailscale { client?.cancel(); row = nil; error = "Private connection changed. Return to Work and reconnect." }
+      }
+      .onDisappear { client?.cancel() }
   }
 }

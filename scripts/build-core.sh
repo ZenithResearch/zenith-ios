@@ -36,3 +36,4 @@ xcodebuild -create-xcframework \
   -library "$wallet_target_dir/aarch64-apple-ios/release/libcastalia_wallet_native.a" -headers "$wallet_source/crates/castalia-wallet-native/include" \
   -output "$output"
 python3 "$app_root/scripts/core-manifest.py" "$wallet_source" "$app_root/Artifacts"
+python3 "$app_root/scripts/prune-build-backups.py" --apply
