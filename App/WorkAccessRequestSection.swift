@@ -66,7 +66,13 @@ struct WorkAccessRequestSection: View {
           if ["active","denied","expired","revoked","superseded","partially_active"].contains(result.status) {
             Button("Request different access") {
               model.perform({ _ in try await client.startNewAccessRequest(store:store,after:result) }) { _ in
-                self.result=nil;catalog=nil;presetID="";paths=[];globalScope=true;beginChoice()
+                self.result=nil;catalog=nil;presetID="";paths=[];globalScope=true
+                if client.connection.serviceID == nil {
+                  // Finish the original legacy request before negotiating the
+                  // current service for a NEW request. Never reuse its receiver.
+                  model.notice = "Original request archived. Choose Request or check access to select new permissions."
+                  model.generation += 1
+                } else { beginChoice() }
               }
             }.disabled(model.busy)
           }
