@@ -67,6 +67,10 @@ actor TailscaleDriver: PrivateNetworkDriver {
     if status.phase == .connected { interactiveLoginPending = false }
     return status
   }
+  func serverCandidates() async throws -> [URL] {
+    guard let node else { throw PrivateNetworkError.disconnected }
+    return try TailnetServerDiscovery.candidates(status: await node.statusJSON())
+  }
   func configuration() async throws -> URLSessionConfiguration {
     guard let node else { throw PrivateNetworkError.disconnected }
     let config = URLSessionConfiguration.ephemeral

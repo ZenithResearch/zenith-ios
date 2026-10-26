@@ -17,6 +17,10 @@ struct WorkServerSetupView: View {
   @State private var discovering = false
   @State private var discoveryTask: Task<Void,Never>?
   @State private var discoveryID: UUID?
+  @State private var tailnetServers: [WorkAccessConfiguration] = []
+  @State private var scanningTailnet = false
+  @State private var scanTask: Task<Void, Never>?
+  @State private var scanMessage: String?
   @State private var nearby: [WorkServerInboxEntry] = []
 
   var body: some View {
@@ -30,14 +34,18 @@ struct WorkServerSetupView: View {
     .navigationTitle("Connect to work")
     .navigationBarTitleDisplayMode(.inline)
     .onAppear { draft.active = true }
-    .onDisappear { cancelDiscovery(); if scene == .active { draft.active = false } }
-    .task { refreshFiles() }
+    .onDisappear { cancelScan(); cancelDiscovery(); if scene == .active { draft.active = false } }
+    .task { refreshFiles(); if privateNetwork.phase == .connected { scanTailnet() } }
     .onChange(of: scene) { _, phase in
-      if phase == .active { refreshFiles() } else { cancelDiscovery() }
+      if phase == .active { refreshFiles() } else { cancelScan(); cancelDiscovery() }
     }
     .onChange(of: draft.discoverViaTailscale) { _, _ in cancelDiscovery(); error = nil }
     .onChange(of: privateNetwork.generation) { _, _ in
-      if draft.discoverViaTailscale { cancelDiscovery() }
+      if draft.discoverViaTailscale { cancelScan(); tailnetServers = []; cancelDiscovery() }
+    }
+    .onChange(of: privateNetwork.phase) { _, phase in
+      if phase == .connected && draft.preview == nil { scanTailnet() }
+      else if phase != .connected { cancelScan(); tailnetServers = [] }
     }
     .sheet(isPresented: $manual) {
       NavigationStack {
@@ -76,6 +84,20 @@ struct WorkServerSetupView: View {
           Text("Connect directly using HTTPS.").font(.footnote).foregroundStyle(.secondary)
         }
       } header: { Text("Network") }
+      if privateNetwork.phase == .connected {
+        Section("Servers on your Tailscale network") {
+          Button("Find servers on Tailscale", systemImage: "network") { scanTailnet() }
+            .disabled(scanningTailnet || busy)
+          if scanningTailnet { ProgressView("Checking visible devices…") }
+          ForEach(tailnetServers, id: \.origin) { server in
+            Button { select(server) } label: {
+              VStack(alignment: .leading) { Text(server.name).font(.headline); Text(server.origin).font(.footnote) }
+            }
+          }
+          if let scanMessage { Text(scanMessage).font(.footnote).foregroundStyle(.secondary) }
+          Text("Checks advertised DevGraph servers on visible devices. Discovery sends no Wallet identity and grants no access. Other addresses can be entered below.").font(.footnote).foregroundStyle(.secondary)
+        }
+      }
       Section {
         TextField("https://your-work-server", text:$draft.address)
           .textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -182,6 +204,26 @@ struct WorkServerSetupView: View {
   @ViewBuilder private var feedback: some View {
     if let message = error ?? saveError { Section { Text(message).foregroundStyle(.red) } }
     if busy { Section { ProgressView("Connecting…") } }
+  }
+  private func cancelScan() {
+    scanTask?.cancel(); scanTask = nil; scanningTailnet = false
+  }
+  private func scanTailnet() {
+    guard privateNetwork.phase == .connected, !scanningTailnet, !busy else { return }
+    scanningTailnet = true; scanMessage = nil
+    let generation = privateNetwork.generation
+    scanTask = Task { @MainActor in
+      do {
+        let found = try await privateNetwork.discoverWorkServers()
+        guard !Task.isCancelled, generation == privateNetwork.generation, scene == .active else { return }
+        tailnetServers = found
+        scanMessage = found.isEmpty ? "No advertised DevGraph servers responded. You can still enter an address or choose a connection file." : "Review a server before saving or connecting your Wallet."
+      } catch {
+        guard !Task.isCancelled, generation == privateNetwork.generation else { return }
+        scanMessage = "Couldn’t finish discovery. Check Tailscale or enter your server address below."
+      }
+      if !Task.isCancelled { scanningTailnet = false; scanTask = nil }
+    }
   }
   private func discover() {
     cancelDiscovery(); discovering = true; error = nil
