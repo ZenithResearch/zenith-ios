@@ -2,13 +2,29 @@ import SwiftUI
 import ZenithKit
 
 @MainActor
-func workClient(_ model: WalletModel) -> DevgraphReadClient? {
+func workClient(_ model: WalletModel) async -> DevgraphReadClient? {
   guard let configuration = model.workServer,
     let repository = model.repository, !model.paused, !model.obscured
   else { return nil }
-  let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : nil
-  return try? DevgraphReadClient(
-    repository: repository, configuration: configuration, transport: transport)
+  let version = model.generation
+  do {
+    let transport = try configuration.network == .tailscale ? model.privateNetwork.transport() : PrivateTransport(workServer: configuration)
+    var resolved = try await configuration.resolveService(transport: transport)
+    // An original request issued to a legacy inbox must be recovered there.
+    // Its signed identity/receiver is never rewritten to adopt another inbox.
+    if resolved.authorityOrigin != configuration.origin, let store = model.accessRequestStore,
+       let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String],
+       let subject = identity["subject_public_key"], let installation = identity["installation_id"],
+       try store.existing(receiver: configuration.origin, subject: subject, installation: installation) != nil {
+      resolved = try configuration.withServiceAccessPoint(nil)
+    }
+    guard !Task.isCancelled, version == model.generation else { transport.cancel(); return nil }
+    return try DevgraphReadClient(repository: repository, configuration: resolved, transport: transport)
+  } catch {
+    guard !Task.isCancelled, version == model.generation else { return nil }
+    model.error = "Could not verify this service connection. Your server and original requests are preserved."
+    return nil
+  }
 }
 struct WorkAccessView: View {
   @EnvironmentObject private var model: WalletModel
@@ -203,6 +219,17 @@ struct WorkAccessView: View {
                 .accessibilityIdentifier("work.access.feedback")
             }
           }
+      } else if let configuration = model.workServer {
+        Form {
+          Section("Saved Work connection") {
+            Text(configuration.name)
+            Text(configuration.origin).font(.caption).foregroundStyle(.secondary)
+            if let error = model.error { Text(error).foregroundStyle(.red) }
+            else { ProgressView("Verifying connection") }
+            Button("Retry connection") { model.error = nil; model.generation += 1 }
+            Button("Change connection") { changingServer = true }
+          }
+        }.navigationTitle("Work access")
       } else {
         WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
           continueSetup = true
@@ -241,7 +268,7 @@ struct WorkAccessView: View {
       holderReview = nil
       current = nil
       reusableAvailable = false
-      client = workClient(model)
+      client = await workClient(model)
       let version = model.generation
       let supports = (try? await client?.supportsReusableGrants()) == true
       let manifest = try? await client?.manifest()
@@ -358,7 +385,7 @@ struct NativeWorkView: View {
           allowed = []
           detailKinds = []
           error = nil
-          client = workClient(model)
+          client = await workClient(model)
           loading = false
           let version = model.generation
           do {
@@ -475,7 +502,7 @@ struct NativeWorkDetailView: View {
         error = nil
         relationships = []
         client?.cancel()
-        client = workClient(model)
+        client = await workClient(model)
         let version = model.generation
         do {
           guard let client else { throw WalletFailure.core("access_setup_required") }
@@ -559,7 +586,7 @@ struct NativeRelatedWorkView: View {
         finished = false
         loading = false
         error = nil
-        client = workClient(model)
+        client = await workClient(model)
         await loadMore()
       }
       .onChange(of: privateNetwork.generation) { _, _ in
