@@ -213,3 +213,10 @@ Build27 adds one automatic Touch ID unlock prompt at launch on iPad when biometr
 
 The [native Wallet experience](docs/native-wallet-experience.md) describes the shared
 Wallet home, recovery/password controls and configurable inactivity lock.
+
+Build storage: successful app/Core packaging automatically keeps one previous
+build and any older backup still in use. `python3 scripts/prune-build-backups.py`
+previews cleanup; add `--apply` to remove eligible backups. If open-file checks
+fail, backups are kept. Current/numbered app releases and source/user data are
+never candidates. Reuse the same build directories rather than creating a new
+dated cache for every run.
