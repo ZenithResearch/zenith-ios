@@ -19,7 +19,7 @@ struct RestoreView: View {
   @State private var dataName = "Castaway data"
   @State private var addingData = false
   @State private var trustApproved = false
-  @State private var preview: RestorePreview?
+  @State private var preview: WalletImportReview?
   @State private var awaitingOperation = false
 
   init(startWithScanner: Bool = false) { _scanInitially = State(initialValue: startWithScanner) }
@@ -54,7 +54,9 @@ struct RestoreView: View {
           awaitingOperation = false; preview = nil; step = .backup
         }
       }
-      .onDisappear { clearPasswords(); model.cancel() }
+      .onChange(of: model.recoverySelection) { _, _ in invalidateReview() }
+      .onChange(of: model.dataSelection) { _, _ in invalidateReview() }
+      .onDisappear { preview = nil; clearPasswords(); model.cancel() }
   }
 
   private var choosePage: some View {
@@ -62,7 +64,7 @@ struct RestoreView: View {
       detail: "Open Zenith Transfer on your laptop and select your recovery file. Its QR carries the encrypted backup.") {
         WalletFilePicker(primary: .scan, startWithScanner: scanInitially, receive: receiveRecovery)
           .onDisappear { scanInitially = false }
-        Text("Your backup stays encrypted until you enter its password on this phone.")
+        Text("Your backup stays encrypted until you enter its password on this device.")
           .font(.footnote).foregroundStyle(.secondary)
         Feedback()
         NavigationLink("I have an older recovery key") { LegacyRecoveryView() }
@@ -86,7 +88,7 @@ struct RestoreView: View {
           Button("Remove data file") { model.dataSelection = nil; dataPassword = "" }
         } else {
           Button("Add a data file (optional)") { addingData = true }.frame(minHeight: 44)
-          Text("You can also add your profile and membership data after importing your wallet.")
+          Text("You can also add your profile, membership proofs and saved account identities after importing your wallet.")
             .font(.footnote).foregroundStyle(.secondary)
         }
         Feedback()
@@ -113,10 +115,10 @@ struct RestoreView: View {
   }
   private var reviewPage: some View {
     WalletFlowPage(step: "Import · 4 of 4", title: "Review your wallet",
-      detail: "Your backup has been checked. Confirm to save this wallet on your phone.",
+      detail: "Your backup has been checked. Confirm to save this wallet on this device.",
       buttonTitle: "Import wallet", enabled: preview != nil, busy: model.busy, action: commit) {
         if let preview {
-          VStack(alignment: .leading, spacing: 20) { PreviewRows(preview: preview) }
+          VStack(alignment: .leading, spacing: 20) { PreviewRows(review: preview) }
             .padding(20).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
           Text("Importing does not activate memberships or connect work access.")
             .font(.footnote).foregroundStyle(.secondary)
@@ -138,16 +140,20 @@ struct RestoreView: View {
     let fileSecret = filePassword
     let data = model.dataSelection, dataSecret = data == nil ? nil : dataPassword
     clearPasswords(); awaitingOperation = true
-    model.perform({ try await $0.prepareRestore(file: file, filePassword: fileSecret,
-      password: localSecret, dataFile: data, dataPassword: dataSecret) }) {
-        preview = $0; awaitingOperation = false; step = .review
-      }
+    model.perform({ repository in
+      let context = try data.map { try WalletImportReview.Context.dataFile($0, recovering: true) } ?? .recovery
+      let value = try await repository.prepareRestore(file: file, filePassword: fileSecret,
+        password: localSecret, dataFile: data, dataPassword: dataSecret)
+      return WalletImportReview(preview: value, context: context)
+    }) {
+      preview = $0; awaitingOperation = false; step = .review
+    }
   }
   private func commit() {
     guard let preview else { return }
     awaitingOperation = true
-    model.perform({ try await $0.commit(preview) }) { _ in
-      awaitingOperation = false
+    model.perform({ try await $0.commit(preview.preview) }) { _ in
+      awaitingOperation = false; self.preview = nil
       model.recoverySelection = nil; model.dataSelection = nil
       model.onboardingCompletion = .imported
     }
@@ -164,6 +170,10 @@ struct RestoreView: View {
   private func changeRecovery() {
     model.recoverySelection = nil; model.dataSelection = nil
     clearPasswords(); model.cancel(); scanInitially = false; step = .choose
+  }
+  private func invalidateReview() {
+    guard preview != nil else { return }
+    preview = nil; model.cancel(); step = model.recoverySelection == nil ? .choose : .backup
   }
   private func clearPasswords() { filePassword = ""; password = ""; confirmation = ""; dataPassword = "" }
 }

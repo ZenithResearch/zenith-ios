@@ -1,0 +1,54 @@
+name: WalletReviewQA
+options:
+  deploymentTarget:
+    iOS: '18.1'
+    macOS: '14.0'
+packages:
+  ZenithKit:
+    path: ../..
+targets:
+  WalletReviewQA:
+    type: application
+    platform: iOS
+    sources: [ReviewApp.swift, preview.json]
+    dependencies:
+      - package: ZenithKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.zenith.preview.wallet-review-qa
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGNING_ALLOWED: NO
+  WalletReviewMacQA:
+    type: application
+    platform: macOS
+    sources: [ReviewApp.swift, preview.json]
+    dependencies:
+      - package: ZenithKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.zenith.preview.wallet-review-mac-qa
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+  WalletReviewQATests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [ReviewUITests.swift]
+    dependencies:
+      - target: WalletReviewQA
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  WalletReviewQA:
+    build:
+      targets:
+        WalletReviewQA: all
+    test:
+      targets: [WalletReviewQATests]
+  WalletReviewMacQA:
+    build:
+      targets:
+        WalletReviewMacQA: all
