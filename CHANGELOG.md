@@ -1,3 +1,10 @@
+## Reusable provider grants — build34 candidate
+
+- Pin the same public Wallet Core0.4 as Transfer, with equal/narrower same-holder derivation and onward delegation disabled.
+- Review and save provider grants, reuse them for native Work reads, and export/restore an encrypted grant backup under Wallet.
+- Offer reusable-grant review on an existing connection without deleting its cached read access.
+- Preserve existing Wallets, identities, settings and legacy credentials. Installed Tailscale qualification remains pending.
+
 ## Native identity consistency — build 33
 
 - Keep legacy Matrix/Nostr application records read-only and preserve their files.

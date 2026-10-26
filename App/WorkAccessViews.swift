@@ -2,12 +2,29 @@ import SwiftUI
 import ZenithKit
 
 @MainActor
-func workClient(_ model: WalletModel) -> DevgraphReadClient? {
+func workClient(_ model: WalletModel) async -> DevgraphReadClient? {
   guard let configuration = model.workServer,
     let repository = model.repository, !model.paused, !model.obscured
   else { return nil }
-  let transport = configuration.network == .tailscale ? model.privateNetwork.transport() : nil
-  return try? DevgraphReadClient(repository: repository, configuration: configuration, transport: transport)
+  let version = model.generation
+  do {
+    let transport = try configuration.network == .tailscale ? model.privateNetwork.transport() : PrivateTransport(workServer: configuration)
+    var resolved = try await configuration.resolveService(transport: transport)
+    // An original request issued to a legacy inbox must be recovered there.
+    // Its signed identity/receiver is never rewritten to adopt another inbox.
+    if resolved.authorityOrigin != configuration.origin, let store = model.accessRequestStore,
+       let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String],
+       let subject = identity["subject_public_key"], let installation = identity["installation_id"],
+       try store.existing(receiver: configuration.origin, subject: subject, installation: installation) != nil {
+      resolved = try configuration.withServiceAccessPoint(nil)
+    }
+    guard !Task.isCancelled, version == model.generation else { transport.cancel(); return nil }
+    return try DevgraphReadClient(repository: repository, configuration: resolved, transport: transport)
+  } catch {
+    guard !Task.isCancelled, version == model.generation else { return nil }
+    model.error = "Could not verify this service connection. Your server and original requests are preserved."
+    return nil
+  }
 }
 struct WorkAccessView: View {
   @EnvironmentObject private var model: WalletModel
@@ -15,6 +32,9 @@ struct WorkAccessView: View {
   @Environment(\.colorScheme) private var colorScheme
   @State private var client: DevgraphReadClient?
   @State private var proposal: ReadAccessProposal?
+  @State private var holderReview: HolderGrantReview?
+  @State private var grantRecovery = false
+  @State private var reusableAvailable = false
   @State private var current: NativeReadManifest?
   @State private var continueSetup = false
   @State private var changingServer = false
@@ -24,14 +44,35 @@ struct WorkAccessView: View {
     Group {
       if let client {
         Form {
-          WorkConnectionSection(configuration: client.connection, busy: model.busy).id(model.generation)
-          if let proposal {
+          WorkConnectionSection(configuration: client.connection, busy: model.busy).id(
+            model.generation)
+          if let holderReview {
+            Section("Save reusable grant") { HolderGrantSummaryView(summary: holderReview.summary) }
+            Section {
+              Button("Save grant in Wallet") {
+                model.perform({ _ in
+                  try await client.saveReusableGrant(holderReview)
+                  return try await client.manifest()
+                }) {
+                  current = $0
+                  self.holderReview = nil
+                  proposal = nil
+                  grantRecovery = false
+                  model.notice = "Grant saved in Wallet. Work is ready to read."
+                }
+              }.buttonStyle(.borderedProminent).disabled(model.busy)
+              Button("Cancel") { self.holderReview = nil }
+            }
+          } else if let proposal {
             Section("Read-only access") {
               LabeledContent("Provider", value: proposal.issuer)
               Text(proposal.receiver).foregroundStyle(.secondary)
               Text("Read permitted work. This cannot create, change or delete anything.")
+              Text(proposal.membershipRequirement.disclosure).font(.footnote)
               LabeledContent("Read credential expires", value: proposal.expires.formatted())
-              Text("You can obtain a new read credential while your operator-approved grant remains active. No new operator decision is needed.").font(.footnote)
+              Text(
+                "You can obtain a new read credential while your operator-approved grant remains active. No new operator decision is needed."
+              ).font(.footnote)
               ForEach(Array(proposal.grants.enumerated()), id: \.offset) { _, grant in
                 Text(grant.work_kinds.joined(separator: ", "))
                 Text("Actions: " + grant.operations.joined(separator: ", "))
@@ -40,7 +81,9 @@ struct WorkAccessView: View {
                 }
                 if let paths = grant.resource_paths {
                   ForEach(paths, id: \.self) { path in Text("Path: " + path.summary) }
-                  Text("Evaluated at each access. New descendants are included; moved-out resources lose access.").font(.footnote)
+                  Text(
+                    "Evaluated at each access. New descendants are included; moved-out resources lose access."
+                  ).font(.footnote)
                 }
                 if let arenas = grant.arena_ids {
                   Text("Arenas: " + arenas.joined(separator: ", "))
@@ -55,7 +98,33 @@ struct WorkAccessView: View {
               }
             }
             Section {
-              Button("Allow read-only access") {
+              if reusableAvailable {
+                Button("Request reusable grant") {
+                  model.perform({ _ in
+                    do { return try await client.requestReusableGrant(proposal) } catch {
+                      grantRecovery = await client.hasPendingReusableGrant()
+                      throw error
+                    }
+                  }) {
+                    holderReview = $0
+                    grantRecovery = false
+                  }
+                }.buttonStyle(.borderedProminent).disabled(model.busy)
+                Text(
+                  "Review the provider-signed grant before saving it. A saved grant lets this Wallet produce its own credentials within the same or a narrower scope."
+                ).font(.footnote)
+                if grantRecovery {
+                  Button("Recover original grant") {
+                    model.perform({ _ in try await client.recoverReusableGrant() }) {
+                      holderReview = $0
+                      grantRecovery = false
+                    }
+                  }
+                  Text("Recover the original result. This does not send a new grant request.").font(
+                    .footnote)
+                }
+              }
+              Button("Use temporary read access") {
                 model.perform({ _ in
                   try await client.connect(proposal)
                   return try await client.manifest()
@@ -65,7 +134,8 @@ struct WorkAccessView: View {
                   model.notice = "Connected. Your work is ready to read."
                 }
               }.buttonStyle(.borderedProminent)
-                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(model.busy)
+                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white).disabled(
+                  model.busy)
               Button("Cancel") {
                 client.cancel()
                 model.cancel()
@@ -81,6 +151,15 @@ struct WorkAccessView: View {
                 value: Date(timeIntervalSince1970: Double(current.expires_at)).formatted())
             }
             Section {
+              if reusableAvailable {
+                Button("Review reusable grant…") {
+                  model.perform({ _ in try await client.prepare() }) { proposal = $0 }
+                }.disabled(model.busy)
+                Text(
+                  "Save a provider-signed grant in Wallet without removing this connection or requesting another operator decision."
+                )
+                .font(.footnote)
+              }
               Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
               Button("Remove read access") {
                 model.perform({ _ in try await client.disconnect() }) { _ in
@@ -90,15 +169,20 @@ struct WorkAccessView: View {
               }
             } footer: {
               Text(
-                "The server can also revoke access. Recovery files do not contain this connection.")
+                "The server can revoke access. Reusable grants have a separate encrypted grant backup in Wallet; connection settings remain in this app."
+              )
             }
           } else if model.state?.canRequestWorkAccess != true {
             Section {
               Text("Prepare your Wallet").font(.headline)
-              Text("Unlock your Wallet and verify its recovery backup before requesting access. Community membership is separate from access to this graph.")
+              Text(
+                "Unlock your Wallet and verify its recovery backup before requesting access. Community membership is separate from access to this graph."
+              )
             }
           } else {
-            if let store = model.accessRequestStore { WorkAccessRequestSection(client:client,store:store) }
+            if let store = model.accessRequestStore {
+              WorkAccessRequestSection(client: client, store: store)
+            }
             Section {
               Text("Approve what you can read").font(.headline)
               Text("Next, your server shows the work available to you and when access expires.")
@@ -106,11 +190,15 @@ struct WorkAccessView: View {
                 model.perform({ _ in try await client.prepare() }) { proposal = $0 }
               }.buttonStyle(.borderedProminent)
                 .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
-                .disabled(model.busy || (client.connection.network == .tailscale && privateNetwork.phase != .connected))
+                .disabled(
+                  model.busy
+                    || (client.connection.network == .tailscale
+                      && privateNetwork.phase != .connected)
+                )
             }
           }
           Section {
-            Button("Membership (optional)") { membershipSetup = true }
+            Button(model.state?.membershipActive == true ? "Community membership · Active" : "Community membership") { membershipSetup = true }
               .accessibilityIdentifier("work.membership.open")
             Button("Change connection") { changingServer = true }.disabled(model.busy)
             Button("Remove server", role: .destructive) {
@@ -118,9 +206,29 @@ struct WorkAccessView: View {
               model.saveWorkServer(nil) {}
             }.disabled(model.busy)
           } footer: {
-            Text("Removes this device’s server settings and read access. Your wallet and server data stay intact.")
+            Text(
+              "Removes this device’s server settings and read access. Your wallet and server data stay intact."
+            )
           }
-          Section { Feedback() }
+        }.navigationTitle("Work access")
+          .safeAreaInset(edge: .bottom) {
+            if model.error != nil || model.notice != nil || model.busy {
+              VStack(alignment: .leading, spacing: 8) { Feedback() }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding().background(.regularMaterial)
+                .accessibilityIdentifier("work.access.feedback")
+            }
+          }
+      } else if let configuration = model.workServer {
+        Form {
+          Section("Saved Work connection") {
+            Text(configuration.name)
+            Text(configuration.origin).font(.caption).foregroundStyle(.secondary)
+            if let error = model.error { Text(error).foregroundStyle(.red) }
+            else { ProgressView("Verifying connection") }
+            Button("Retry connection") { model.error = nil; model.generation += 1 }
+            Button("Change connection") { changingServer = true }
+          }
         }.navigationTitle("Work access")
       } else {
         WorkServerSetupView(busy: model.busy, saveError: model.error) { configuration in
@@ -148,16 +256,24 @@ struct WorkAccessView: View {
           model.saveWorkServer(configuration) { changingServer = false }
         }
         .environmentObject(model.workDraft)
-        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { changingServer = false } } }
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { changingServer = false }
+          }
+        }
       }
     }.task(id: model.generation) {
       client?.cancel()
       proposal = nil
+      holderReview = nil
       current = nil
-      client = workClient(model)
+      reusableAvailable = false
+      client = await workClient(model)
       let version = model.generation
+      let supports = (try? await client?.supportsReusableGrants()) == true
       let manifest = try? await client?.manifest()
       guard !Task.isCancelled, version == model.generation else { return }
+      reusableAvailable = supports
       current = manifest
       if continueSetup {
         continueSetup = false
@@ -235,7 +351,9 @@ struct NativeWorkView: View {
       }.navigationTitle("Work")
         .searchable(text: $search, prompt: "Search loaded work")
         .refreshable {
-          rows = []; cursors = [:]; finished = []
+          rows = []
+          cursors = [:]
+          finished = []
           await loadMore()
         }
         .toolbar {
@@ -267,13 +385,14 @@ struct NativeWorkView: View {
           allowed = []
           detailKinds = []
           error = nil
-          client = workClient(model)
+          client = await workClient(model)
           loading = false
           let version = model.generation
           do {
             if let manifest = try await client?.manifest() {
               guard !Task.isCancelled, version == model.generation else { return }
-              detailKinds = Set(manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
+              detailKinds = Set(
+                manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
               allowed = Array(
                 Set(
                   manifest.read_grants.filter { $0.operations.contains("list") }.flatMap(
@@ -296,7 +415,9 @@ struct NativeWorkView: View {
     .onChange(of: privateNetwork.generation) { _, _ in
       if model.workServer?.network == .tailscale {
         client?.cancel()
-        rows = []; cursors = [:]; finished = []
+        rows = []
+        cursors = [:]
+        finished = []
         loading = false
         error = "Private connection changed. Open Connection to reconnect."
       }
@@ -311,15 +432,15 @@ struct NativeWorkView: View {
     let usesPrivateNetwork = client.connection.network == .tailscale
     let networkVersion = privateNetwork.generation
     func current() -> Bool {
-      version == model.generation && (!usesPrivateNetwork || networkVersion == privateNetwork.generation)
+      version == model.generation
+        && (!usesPrivateNetwork || networkVersion == privateNetwork.generation)
     }
     defer { if current() { loading = false } }
     do {
       for type in allowed where !finished.contains(type) {
         let page = try await client.page(kind: type, after: cursors[type])
         guard current(), !Task.isCancelled else { return }
-        if let next = page.next { cursors[type] = next }
-        else { finished.insert(type) }
+        if let next = page.next { cursors[type] = next } else { finished.insert(type) }
         let existing = Set(rows.map(\.rowID))
         guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else {
           throw WalletFailure.core("invalid_response")
@@ -359,7 +480,11 @@ struct NativeWorkDetailView: View {
           Text(record.title).font(.title2.bold())
           Text(record.progressLabel).font(.subheadline)
           Text(record.description).textSelection(.enabled)
-          if !canRead { Text("Your access includes this summary. Full item details need separate read permission.").font(.footnote) }
+          if !canRead {
+            Text(
+              "Your access includes this summary. Full item details need separate read permission."
+            ).font(.footnote)
+          }
           ForEach(relationships, id: \.self) { relationship in
             NavigationLink(relationshipTitle(relationship)) {
               NativeRelatedWorkView(anchor: record, relationship: relationship)
@@ -367,17 +492,24 @@ struct NativeWorkDetailView: View {
           }
         } else if let error {
           Text(error)
-        } else { ProgressView("Loading item") }
+        } else {
+          ProgressView("Loading item")
+        }
       }.frame(maxWidth: .infinity, alignment: .leading).padding()
     }.navigationTitle("Work item").navigationBarTitleDisplayMode(.inline)
       .task(id: model.generation) {
-        record = nil; error = nil; relationships = []; client?.cancel()
-        client = workClient(model)
+        record = nil
+        error = nil
+        relationships = []
+        client?.cancel()
+        client = await workClient(model)
         let version = model.generation
         do {
           guard let client else { throw WalletFailure.core("access_setup_required") }
           let manifest = try await client.manifest()
-          let permitted = manifest.read_grants.filter { $0.operations.contains("relationships") && $0.work_kinds.contains(row.kind) }
+          let permitted = manifest.read_grants.filter {
+            $0.operations.contains("relationships") && $0.work_kinds.contains(row.kind)
+          }
           let loaded = canRead ? try await client.get(kind: row.kind, id: row.id) : row
           guard !Task.isCancelled, version == model.generation else { return }
           record = loaded
@@ -389,22 +521,30 @@ struct NativeWorkDetailView: View {
       }
       .onChange(of: privateNetwork.generation) { _, _ in
         if model.workServer?.network == .tailscale {
-          client?.cancel(); record = nil
+          client?.cancel()
+          record = nil
           error = "Private connection changed. Return to Work and reconnect."
         }
       }
-      .onDisappear { client?.cancel(); record = nil }
+      .onDisappear {
+        client?.cancel()
+        record = nil
+      }
   }
 }
 
 private func relationshipTitle(_ relationship: String) -> String {
-  ["children": "Children", "parent": "Parent", "dependencies": "Depends on",
-   "dependents": "Used by", "blocked": "Blocks", "blockers": "Blocked by"][relationship] ?? "Related work"
+  [
+    "children": "Children", "parent": "Parent", "dependencies": "Depends on",
+    "dependents": "Used by", "blocked": "Blocks", "blockers": "Blocked by",
+  ][relationship] ?? "Related work"
 }
 private func invalidatesWorkAccess(_ error: Error) -> Bool {
   guard let failure = error as? WalletFailure, case .core(let code) = failure else { return false }
-  return ["access_denied", "access_expired", "access_setup_required", "membership_required",
-    "invalid_read_authority", "read_not_permitted", "issuer_setup_required"].contains(code)
+  return [
+    "access_denied", "access_expired", "access_setup_required", "membership_required",
+    "invalid_read_authority", "read_not_permitted", "issuer_setup_required",
+  ].contains(code)
 }
 struct NativeRelatedWorkView: View {
   let anchor: WorkRecord
@@ -430,19 +570,30 @@ struct NativeRelatedWorkView: View {
           }
         }
       }
-      if loading { ProgressView("Loading related work") }
-      else if let error { Text(error) }
-      else if rows.isEmpty { Text("No related work is visible within your access.") }
+      if loading {
+        ProgressView("Loading related work")
+      } else if let error {
+        Text(error)
+      } else if rows.isEmpty {
+        Text("No related work is visible within your access.")
+      }
       if !finished && !loading && error == nil { Button("Load more") { Task { await loadMore() } } }
     }.navigationTitle(relationshipTitle(relationship))
       .task(id: model.generation) {
-        client?.cancel(); rows = []; cursor = nil; finished = false; loading = false; error = nil
-        client = workClient(model)
+        client?.cancel()
+        rows = []
+        cursor = nil
+        finished = false
+        loading = false
+        error = nil
+        client = await workClient(model)
         await loadMore()
       }
       .onChange(of: privateNetwork.generation) { _, _ in
         if model.workServer?.network == .tailscale {
-          client?.cancel(); rows = []; loading = false
+          client?.cancel()
+          rows = []
+          loading = false
           error = "Private connection changed. Return to Work and reconnect."
         }
       }
@@ -450,25 +601,35 @@ struct NativeRelatedWorkView: View {
   }
   private func loadMore() async {
     guard !loading, !finished, let client else { return }
-    loading = true; error = nil
+    loading = true
+    error = nil
     let version = model.generation
     let networkVersion = privateNetwork.generation
     func current() -> Bool {
-      version == model.generation && (client.connection.network != .tailscale || networkVersion == privateNetwork.generation)
+      version == model.generation
+        && (client.connection.network != .tailscale || networkVersion == privateNetwork.generation)
     }
     defer { if current() { loading = false } }
     do {
       let manifest = try await client.manifest()
-      let page = try await client.related(kind: anchor.kind, id: anchor.id, relationship: relationship, after: cursor)
+      let page = try await client.related(
+        kind: anchor.kind, id: anchor.id, relationship: relationship, after: cursor)
       guard current(), !Task.isCancelled else { return }
-      detailKinds = Set(manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
+      detailKinds = Set(
+        manifest.read_grants.filter { $0.operations.contains("get") }.flatMap(\.work_kinds))
       let existing = Set(rows.map(\.rowID))
-      guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else { throw WalletFailure.core("invalid_response") }
+      guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else {
+        throw WalletFailure.core("invalid_response")
+      }
       rows.append(contentsOf: page.items)
-      cursor = page.next; finished = page.next == nil
+      cursor = page.next
+      finished = page.next == nil
     } catch {
       guard current(), !Task.isCancelled else { return }
-      if invalidatesWorkAccess(error) { rows = []; finished = true }
+      if invalidatesWorkAccess(error) {
+        rows = []
+        finished = true
+      }
       self.error = error.localizedDescription
     }
   }

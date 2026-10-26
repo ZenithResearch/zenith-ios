@@ -126,7 +126,7 @@ struct WalletView: View {
           case .identities: PortableWalletIdentitiesView(repository: model.repository, unlocked: model.state?.unlocked == true, legacy: model.identityAccounts, changed: { Task { await model.load() } })
           case .membership: WalletMembershipContent(repository: model.repository, unlocked: model.state?.unlocked == true)
           case .recovery: RecoveryView()
-          case .access: WorkAccessView()
+          case .access: ScrollView { WalletGrantsView(repository:model.repository,unlocked:model.state?.unlocked == true) }
           case .security: WalletSecurityView()
           case .about: WalletAboutContent()
           }

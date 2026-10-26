@@ -1,5 +1,6 @@
 import SwiftUI
 import ZenithKit
+import CastaliaCustody
 
 @main
 struct ZenithApp: App {
@@ -18,7 +19,10 @@ struct ZenithApp: App {
             ? UIColor(red: 0.47, green: 0.91, blue: 0.78, alpha: 1)
             : UIColor(red: 0.09, green: 0.34, blue: 0.28, alpha: 1)
         }))
-        .task { await model.load() }
+        .task {
+          if UIApplication.shared.isProtectedDataAvailable { await model.privateNetwork.restoreSavedConnection() }
+          await model.load()
+        }
         .onChange(of: scene) { _, phase in
           switch phase {
           case .background: model.pauseInBackground()
@@ -33,7 +37,7 @@ struct ZenithApp: App {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in
           if scene == .active { model.resumeFromBackground() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in model.suspend() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in model.privateNetwork.suspend(); model.suspend() }
     }
   }
 }
@@ -44,7 +48,7 @@ final class WalletModel: ObservableObject {
   let biometricUnlock = BiometricUnlock(store: BiometricKeychain())
   var automaticBiometricUnlock = AutomaticBiometricUnlock()
   @Published var biometricEnabled = false
-  let privateNetwork = PrivateNetworkModel(driver: TailscaleDriver())
+  let privateNetwork = PrivateNetworkModel(driver: TailscaleDriver(), preferences: .standard)
   enum OnboardingCompletion { case created, imported }
   @Published var onboardingCompletion: OnboardingCompletion?
   static let unlockSettingKey = "wallet.unlockDurationSeconds.v1"
@@ -69,7 +73,7 @@ final class WalletModel: ObservableObject {
   @Published private(set) var workServer: WorkAccessConfiguration?
   private var workServerStore: WorkServerStore?
   private(set) var accessRequestStore: WorkAccessRequestStore?
-  private(set) var repository: WalletRepository?
+  private(set) var repository: (any WalletSession)?
   private var operation: Task<Void, Never>?
   private var backgrounded = false
   private var backgroundEpoch = 0
@@ -135,7 +139,7 @@ final class WalletModel: ObservableObject {
     }
   }
   func perform<T>(
-    _ action: @escaping (WalletRepository) async throws -> T, success: @escaping (T) -> Void
+    _ action: @escaping (any WalletSession) async throws -> T, success: @escaping (T) -> Void
   ) {
     guard !expire(), !busy, !paused, !obscured, let repository else { return }
     busy = true
@@ -172,7 +176,8 @@ final class WalletModel: ObservableObject {
     backgrounded = false
     paused = false
     biometricUnlock.cancel()
-    privateNetwork.suspend()
+    // Wallet custody and network enrollment have independent lifecycles.
+    // Background/device lock still closes the embedded node below.
     operation?.cancel()
     operation = nil
     generation += 1
@@ -204,7 +209,7 @@ final class WalletModel: ObservableObject {
   }
   func resumeFromBackground() {
     guard UIApplication.shared.isProtectedDataAvailable else { return }
-    if expire() { obscured = false; return }
+    if expire() { obscured = false; privateNetwork.resume(); return }
     obscured = false
     guard backgrounded else { privateNetwork.resume(); return }
     let epoch = backgroundEpoch

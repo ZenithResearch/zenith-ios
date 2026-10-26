@@ -34,17 +34,35 @@ struct PrivateNetworkRow: View {
         }
         Button("Cancel") { network.cancelSignIn() }
       } else {
-        Button("Connect Tailscale") {
-          UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-          network.connect()
-        }.accessibilityIdentifier("work.tailscale.connect")
+        if network.savedConnectionNeedsRetry {
+          Button("Retry saved connection", systemImage: "arrow.clockwise") {
+            Task { await network.retrySavedConnection() }
+          }.buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailscale.retrySavedConnection")
+        } else if network.hasSavedConnection {
+          Button("Reconnect to Tailscale", systemImage: "arrow.clockwise") { network.reconnect() }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailscale.reconnect")
+          Text("Uses this installation’s saved device identity. No auth key is needed.")
+            .font(.footnote).foregroundStyle(.secondary)
+        }
+        if network.hasSavedConnection || network.savedConnectionNeedsRetry {
+          DisclosureGroup("Other sign-in options") { signInOptions }
+        } else { signInOptions }
       }
-      if network.phase != .connected && network.phase != .connecting
-        && network.phase != .awaitingApproval {
+      if network.hasSavedConnection {
+        Toggle("Reconnect automatically", isOn: Binding(
+          get: { network.automaticallyReconnect },
+          set: { network.setAutomaticallyReconnect($0) }))
+          .accessibilityIdentifier("tailscale.reconnectAutomatically")
+        Text("Restores this app’s private connection on launch and when you return. Disconnect pauses automatic reconnection until you choose Reconnect.")
+          .font(.footnote).foregroundStyle(.secondary)
+      }
+      if network.phase == .signInRequired {
         Button("Sign in with an auth key", systemImage: "key") { enrolling = true }
           .accessibilityIdentifier("tailscale.enroll")
       }
-      if let message = network.message { Text(message).font(.footnote).foregroundStyle(.secondary) }
+      if let message = network.message { Text(message).font(.footnote).foregroundStyle(.red) }
     }.padding(.vertical, 4)
     Text(explanation)
       .font(.footnote).foregroundStyle(.secondary)
@@ -54,7 +72,8 @@ struct PrivateNetworkRow: View {
         else { browser = nil }
       }
       .onChange(of: network.phase) { _, phase in
-        if phase == .connected { browser = nil; statusFocused = true }
+        if phase == .connected { browser = nil }
+        if phase == .connected || phase == .failed || phase == .awaitingApproval || phase == .signInRequired { statusFocused = true }
       }
       .sheet(item: $browser, onDismiss: {
         statusFocused = true
@@ -71,25 +90,46 @@ struct PrivateNetworkRow: View {
         NavigationStack {
           Form {
             Section {
-              Label("Private network connected", systemImage: "checkmark.shield")
+              Label(status, systemImage: network.phase == .connected ? "checkmark.shield" : "network")
+              if let message = network.message { Text(message).foregroundStyle(.red) }
+              if network.phase == .connecting { ProgressView("Reconnecting…") }
+              if network.phase == .awaitingApproval { Text("Your network administrator needs to approve this device.") }
               if let name = network.networkName { LabeledContent("Network", value: name) }
               Text("Work and Chat share this private connection inside Zenith. Other apps use their own connections.")
+              Toggle("Reconnect automatically", isOn: Binding(
+                get: { network.automaticallyReconnect },
+                set: { network.setAutomaticallyReconnect($0) }))
+              Text("The device sign-in stays saved when the app closes. iOS pauses this embedded connection in the background; Zenith restores it when you return.")
+                .font(.footnote).foregroundStyle(.secondary)
             }
             Section {
               Button("Disconnect Tailscale") { network.disconnect(); managing = false }
             } footer: {
-              Text("Pauses this app’s connection. Your saved server settings stay on this iPhone. Remove this device in the Tailscale admin console to revoke its network membership.")
+              Text("Pauses this app’s connection and keeps it disconnected across launches until you choose Reconnect. The saved device identity and server settings stay on this device. Remove this device in the Tailscale admin console to revoke its network membership.")
             }
           }.navigationTitle("Private connection").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { managing = false } } }
-        }.presentationDetents([.medium, .large])
+        }.presentationDetents([.large])
       }
+  }
+  private var signInOptions: some View {
+    Group {
+      Button(network.hasSavedConnection ? "Use a new auth key" : "Sign in with an auth key", systemImage: "key") { enrolling = true }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("tailscale.enroll")
+      Text("Use a separate one-time key for each Zenith installation.")
+        .font(.footnote).foregroundStyle(.secondary)
+      Button("Use browser sign-in") {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        network.connect()
+      }.accessibilityIdentifier("work.tailscale.connect")
+    }
   }
   private var status: String {
     switch network.phase {
-    case .idle: return "Tailscale not connected"
+    case .idle: return network.hasSavedConnection ? "Disconnected · Reconnect when ready" : "Tailscale not connected"
     case .connecting: return "Connecting Tailscale…"
-    case .signInRequired: return "Not signed in"
+    case .signInRequired: return network.hasSavedConnection ? "Sign-in needs renewal" : "Not signed in"
     case .awaitingApproval: return "Waiting for device approval"
     case .connected: return "Private network connected"
     case .paused: return "Tailscale paused"
@@ -105,6 +145,7 @@ private struct TailscaleEnrollmentView: View {
   @State private var importing = false
   @State private var submitted = false
   @State private var error: String?
+  @AccessibilityFocusState private var errorFocused: Bool
   var body: some View {
     NavigationStack {
       Form {
@@ -115,10 +156,15 @@ private struct TailscaleEnrollmentView: View {
             .privacySensitive().accessibilityIdentifier("tailscale.authKey")
           Button("Choose auth key file", systemImage: "doc.badge.plus") { importing = true }
         } footer: {
-          Text("Use a one-time, non-ephemeral auth key from your Tailscale administrator. Work and Chat will share the saved device sign-in. This key is different from your Hermes gateway key.")
+          Text("Use a one-time, non-ephemeral auth key from your Tailscale administrator. Create a separate key for each device. Work and Chat share the saved device sign-in; normal reconnects use its saved device identity. This key is different from your Hermes gateway key.")
         }
         Section {
-          Button("Enroll this iPhone") {
+          Link("Create an auth key in Tailscale", destination: URL(string: "https://login.tailscale.com/admin/settings/keys")!)
+          Text("Choose Generate auth key with Reusable and Ephemeral off. Leave Tags unset for your personal device. Keep device approval enabled if your network uses it.")
+            .font(.footnote).foregroundStyle(.secondary)
+        }
+        Section {
+          Button("Enroll this device") {
             let value = key
             key = ""
             do {
@@ -135,9 +181,9 @@ private struct TailscaleEnrollmentView: View {
               ProgressView("Enrolling with Tailscale…")
             }
           }
-          if let error { Text(error).foregroundStyle(.red) }
+          if let error { Text(error).foregroundStyle(.red).accessibilityFocused($errorFocused) }
         } footer: {
-          Text("Zenith clears the entered key when you submit or leave this screen. Reconnects use the protected device identity saved on this iPhone. A transferred key file stays in Files until you remove it.")
+          Text("Zenith clears the entered key when you submit or leave this screen. Reconnects use the protected device identity saved on this device. A transferred key file stays in Files until you remove it.")
         }
       }.navigationTitle("Tailscale enrollment").navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -147,8 +193,14 @@ private struct TailscaleEnrollmentView: View {
               dismiss()
             }
           }
+          ToolbarItem(placement: .confirmationAction) {
+            if submitted && network.phase == .awaitingApproval {
+              Button("Keep waiting") { dismiss() }
+            }
+          }
         }
         .interactiveDismissDisabled(submitted)
+        .onChange(of: error) { _, value in if value != nil { errorFocused = true } }
         .onChange(of: network.phase) { _, phase in
           guard submitted else { return }
           if phase == .connected { dismiss() }
@@ -162,6 +214,8 @@ private struct TailscaleEnrollmentView: View {
         }
         .onDisappear { key = "" }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.plainText, .data]) { result in
+          if case .failure(let error) = result,
+            (error as NSError).code == NSUserCancelledError { return }
           do {
             let url = try result.get()
             let scoped = url.startAccessingSecurityScopedResource()

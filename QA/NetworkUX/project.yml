@@ -1,0 +1,31 @@
+name: NetworkUX
+options:
+  deploymentTarget:
+    iOS: '18.1'
+packages:
+  ZenithKit:
+    path: ../..
+targets:
+  NetworkUX:
+    type: application
+    platform: iOS
+    sources:
+      - path: NetworkUXApp.swift
+      - path: ../../App/Networking/PrivateNetworkView.swift
+    dependencies:
+      - package: ZenithKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.zenith.preview.network-ux
+        PRODUCT_NAME: NetworkUX
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zenith Network UX
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+        SWIFT_VERSION: '5.9'
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  NetworkUX:
+    build:
+      targets:
+        NetworkUX: all

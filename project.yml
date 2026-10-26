@@ -39,6 +39,8 @@ targets:
         excludes: [WorkAccess.json, Membership.json]
     dependencies:
       - package: ZenithKit
+      - package: ZenithKit
+        product: CastaliaCustody
       - framework: Artifacts/TailscaleKit.xcframework
         embed: true
         codeSign: true
@@ -53,7 +55,7 @@ targets:
         TARGETED_DEVICE_FAMILY: '1,2'
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: '0.1.0'
-        CURRENT_PROJECT_VERSION: '33'
+        CURRENT_PROJECT_VERSION: '39'
 schemes:
   Zenith:
     build:

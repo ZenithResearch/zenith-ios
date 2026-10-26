@@ -25,7 +25,7 @@ extension TransferOperatorBridge {
 @MainActor final class TransferOperatorBridge: NSObject, ObservableObject, WKURLSchemeHandler,
   WKNavigationDelegate, WKScriptMessageHandlerWithReply {
   let resource: RegisteredResource
-  let repository: WalletRepository
+  let repository: any WalletSession
   weak var webView: WKWebView?
   @Published var consent: OperatorConsent?
   @Published var failure: String?
@@ -48,7 +48,7 @@ extension TransferOperatorBridge {
     return Bundle.module.resourceURL!.appendingPathComponent("Operator")
   }()
 
-  init(resource: RegisteredResource, repository: WalletRepository,
+  init(resource: RegisteredResource, repository: any WalletSession,
     transport suppliedTransport: PrivateTransport? = nil, journalDirectory: URL? = nil,
     rpcExchange: ((String, Data) async throws -> PrivateHTTPResponse)? = nil) {
     self.resource = resource; self.repository = repository
@@ -193,7 +193,7 @@ extension TransferOperatorBridge {
     case "post":
       guard let path = args["path"] as? String,
         ["/devgraph/access-operator/v1/challenges","/devgraph/access-operator/v1/actions"].contains(path),
-        let text = args["body"] as? String, text.utf8.count <= 65_536, transport != nil || localRPC != nil || rpcExchange != nil else { throw WalletFailure.invalidFile }
+        let text = args["body"] as? String, text.utf8.count <= 524_288, transport != nil || localRPC != nil || rpcExchange != nil else { throw WalletFailure.invalidFile }
       let body = Data(text.utf8), input = try object(body)
       let actionCall = path.hasSuffix("/actions")
       if actionCall {
