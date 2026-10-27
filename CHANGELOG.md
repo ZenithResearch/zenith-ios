@@ -1,3 +1,8 @@
+## Current-and-future Arena reads — build 45 candidate
+
+- Read explicitly granted current/future Arena records with the shared native v6 protocol, including opening their detail screens.
+- Preserve fixed-ID grants, saved connections, Wallets/settings and separate Work permissions. No grant is created by updating.
+
 ## Connection recovery and membership restore — build 44 candidate
 
 - Resume Work verification when embedded Tailscale becomes ready and show network recovery on the verification screen.

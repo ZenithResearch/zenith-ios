@@ -107,8 +107,10 @@ struct WorkAccessView: View {
                 }
                 if let arenas = grant.arena_ids {
                   Text((grant.isArena ? "Only Arena records: " : "Work in Arenas: ") + arenas.joined(separator: ", "))
+                } else if grant.isArena && grant.all_arenas == true {
+                  Text("All current and future Arena records")
                 } else if grant.resource_paths == nil {
-                  Text("All arenas")
+                  Text("All matching Work resources")
                 }
                 if let ids = grant.work_ids {
                   Text("Selected items: " + ids.joined(separator: ", "))
@@ -715,12 +717,13 @@ struct NativeArenaListView: View {
   @State private var finished = false
   @State private var error: String?
   @State private var detailIDs: Set<String> = []
+  @State private var allArenaDetails = false
   var body: some View {
     List {
       Section {
         Text("Only explicitly shared Arena records appear here. Work requires its own permission.").font(.footnote)
         ForEach(rows) { row in
-          if detailIDs.contains(row.id) {
+          if allArenaDetails || detailIDs.contains(row.id) {
             NavigationLink(row.title) {
               NativeArenaDetailView(id: row.id)
             }
@@ -736,11 +739,13 @@ struct NativeArenaListView: View {
       .task(id: model.generation) {
         client?.cancel(); client = await workClient(model)
         rows = []; after = nil; finished = false; error = nil; loading = false
+        detailIDs = []; allArenaDetails = false
         await load()
       }
       .onChange(of: privateNetwork.generation) { _, _ in
         if model.workServer?.network == .tailscale {
-          client?.cancel(); rows = []; error = "Private connection changed. Return to Work and reconnect."
+          client?.cancel(); rows = []; detailIDs = []; allArenaDetails = false
+          error = "Private connection changed. Return to Work and reconnect."
         }
       }
       .onDisappear { client?.cancel() }
@@ -757,11 +762,15 @@ struct NativeArenaListView: View {
       guard current() else { return }
       let existing = Set(rows.map(\.id))
       guard page.items.allSatisfy({ !existing.contains($0.id) }) else { throw WalletFailure.core("invalid_response") }
-      detailIDs = Set(manifest.read_grants.filter { $0.isArena && $0.operations.contains("get") }.flatMap { $0.arena_ids ?? [] })
+      let detailGrants = manifest.read_grants.filter { $0.isArena && $0.operations.contains("get") }
+      detailIDs = Set(detailGrants.flatMap { $0.arena_ids ?? [] })
+      allArenaDetails = detailGrants.contains { $0.all_arenas == true }
       rows += page.items; after = page.next; finished = page.next == nil
     } catch {
       guard current() else { return }
-      if invalidatesWorkAccess(error) { rows = []; finished = true }
+      if invalidatesWorkAccess(error) {
+        rows = []; detailIDs = []; allArenaDetails = false; finished = true
+      }
       self.error = error.localizedDescription
     }
   }
