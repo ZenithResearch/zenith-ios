@@ -99,6 +99,7 @@ struct WorkAccessView: View {
                 if grant.operations.contains("relationships") {
                   Text("Related work: " + grant.relationship_types.joined(separator: ", "))
                 }
+                if let selection = grant.resource_selection { Text("Additional resource selection").font(.caption.bold()); Text(selection).font(.caption.monospaced()).textSelection(.enabled) }
                 if let paths = grant.resource_paths {
                   ForEach(paths, id: \.self) { path in Text("Path: " + path.summary) }
                   Text(

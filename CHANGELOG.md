@@ -62,6 +62,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- Read, review, save and restore scoped v2 holder grants through the same shared signer and encrypted Wallet store — preserve v1 grants while keeping exact selectors and canonical-service identity visible across access points.
+
+
 ### Changed
 
 - Align native iOS build 29 with public `ZenithResearch/castalia-wallet` revision `7d81c5b0a9f74271fb5b2d5ea8d2711df40bf485` — use the same canonical Wallet source as Transfer build 33 and Chrome 0.0.2 while preserving the native ABI, encrypted custody and app identity.
