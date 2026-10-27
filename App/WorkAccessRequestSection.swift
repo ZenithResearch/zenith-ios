@@ -6,7 +6,8 @@ struct WorkAccessRequestSection: View {
   let store: WorkAccessRequestStore
   @EnvironmentObject private var model: WalletModel
   @State private var consent: WorkAccessRequestConsent?
-  @State private var result: WorkAccessRequestResult?
+  @Binding var result: WorkAccessRequestResult?
+  @Binding var editingRequest: Bool
   @State private var catalog: WorkAccessCatalog?
   @State private var choosing = false
   @State private var presetID = ""
@@ -81,7 +82,9 @@ struct WorkAccessRequestSection: View {
         }
         Button(result == nil ? "Request or check access" : "Check request") { beginChoice() }.disabled(model.busy)
       }
-    } header: { Text("Request access") } footer: { Text("An approved grant can be reused while valid. Choose Continue below to review exact read permissions in Wallet. Requesting access never grants it automatically.") }
+    } header: { Text("Request access") } footer: { Text("Requesting credentials needs Wallet identity proof, not existing graph access. Once read access is approved, review its exact permissions below. An approved grant can be reused while valid.") }
+    .onChange(of:consent != nil || choosing) { _, active in editingRequest = active }
+    .onDisappear { editingRequest = false }
     .onChange(of:model.generation) { _,_ in consent=nil;choosing=false;catalog=nil;result=nil;paths=[];globalScope=true;presetID="" }
   }
   private func beginChoice() {
@@ -98,7 +101,7 @@ struct WorkAccessRequestSection: View {
   private func status(_ value:String) -> String {
     switch value {
     case "pending": return "Request sent · Waiting for the server operator"
-    case "active": return "Access approved · Continue below to review your read permissions"
+    case "active": return "Access approved · Review its permissions below"
     case "partially_active": return "Some access remains active · Check the server’s current permissions"
     case "approved", "approved_pending_activation": return "Request reviewed · The operator still needs to activate access"
     case "denied", "declined": return "Request declined · Contact the server operator"

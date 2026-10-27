@@ -1,3 +1,9 @@
+## Credential-request clarity — build 43 candidate
+
+- Separate requesting credentials from enrolling existing read access.
+- Keep requests available to readers and give request denials their own message.
+- Preserve original request IDs, Wallet data, server settings and all verification.
+
 ## Reusable provider grants — build34 candidate
 
 - Pin the same public Wallet Core0.4 as Transfer, with equal/narrower same-holder derivation and onward delegation disabled.

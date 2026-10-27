@@ -35,6 +35,8 @@ struct WorkAccessView: View {
   @State private var holderReview: HolderGrantReview?
   @State private var grantRecovery = false
   @State private var reusableAvailable = false
+  @State private var requestResult: WorkAccessRequestResult?
+  @State private var editingRequest = false
   @State private var current: NativeReadManifest?
   @State private var continueSetup = false
   @State private var changingServer = false
@@ -146,6 +148,9 @@ struct WorkAccessView: View {
               }
             }
           } else if let current {
+            if let store = model.accessRequestStore {
+              WorkAccessRequestSection(client: client, store: store, result: $requestResult, editingRequest: $editingRequest)
+            }
             Section {
               LabeledContent("Access", value: "Read only")
               Text(current.receiver)
@@ -184,20 +189,23 @@ struct WorkAccessView: View {
             }
           } else {
             if let store = model.accessRequestStore {
-              WorkAccessRequestSection(client: client, store: store)
+              WorkAccessRequestSection(client: client, store: store, result: $requestResult, editingRequest: $editingRequest)
             }
-            Section {
-              Text("Approve what you can read").font(.headline)
-              Text("Next, your server shows the work available to you and when access expires.")
-              Button("Continue") {
-                model.perform({ _ in try await client.prepare() }) { proposal = $0 }
-              }.buttonStyle(.borderedProminent)
-                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
-                .disabled(
-                  model.busy
-                    || (client.connection.network == .tailscale
-                      && privateNetwork.phase != .connected)
-                )
+            if !editingRequest {
+              Section {
+                if requestResult?.canReviewReadAccess == true {
+                  Text("Read access approved").font(.headline)
+                  Text("Review the exact permissions before saving read access on this device.")
+                  Button("Review approved read access") { reviewReadAccess(client) }
+                    .buttonStyle(.borderedProminent).disabled(readReviewDisabled(client))
+                } else {
+                  DisclosureGroup("Already have an approved read grant?") {
+                    Text("Check existing read access without sending another credential request. You can request credentials above even if no grant exists.").font(.footnote)
+                    Button("Check existing read access") { reviewReadAccess(client) }
+                      .disabled(readReviewDisabled(client))
+                  }
+                }
+              }
             }
           }
           Section {
@@ -270,6 +278,7 @@ struct WorkAccessView: View {
       proposal = nil
       holderReview = nil
       current = nil
+      requestResult = nil; editingRequest = false
       reusableAvailable = false
       client = await workClient(model)
       let version = model.generation
@@ -299,6 +308,21 @@ struct WorkAccessView: View {
       if !membershipSetup { model.cancel() }
     }
   }
+  private func readReviewDisabled(_ client: DevgraphReadClient) -> Bool {
+    model.busy || (client.connection.network == .tailscale && privateNetwork.phase != .connected)
+  }
+  private func reviewReadAccess(_ client: DevgraphReadClient) {
+    model.perform({ _ -> ReadAccessProposal? in
+      do { return try await client.prepare() }
+      catch WalletFailure.core("access_denied") { return nil }
+    }) { available in
+      if let available { proposal = available }
+      else {
+        model.notice = "No approved read access was found. You can still send or check a credential request above; it does not require existing graph access."
+      }
+    }
+  }
+
 }
 struct NativeWorkView: View {
   @EnvironmentObject private var model: WalletModel
