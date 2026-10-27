@@ -19,6 +19,7 @@ struct DataFileView: View {
         Text(
           "A Castaway data file contains your profile, membership proofs, saved account identities and public account descriptors. It cannot restore your signing identity or connect work."
         )
+        NavigationLink("Review membership provider") { MembershipView() }
       }
       if let preview {
         Section("Review import") {
@@ -41,7 +42,7 @@ struct DataFileView: View {
         }
       } else {
         Section("Import") {
-          Button(model.dataSelection == nil ? "Choose data file" : "Choose another file") {
+          Button(model.dataSelection == nil ? "Choose Castaway data file" : "Choose another file") {
             selecting = true
           }.frame(minHeight: 44)
           TransferImportButtons { model.dataSelection = $0; password = "" }
@@ -76,7 +77,7 @@ struct DataFileView: View {
         }
       }
       Section { Feedback() }
-    }.navigationTitle("Data file")
+    }.navigationTitle("Castaway data")
       .fileImporter(isPresented: $selecting, allowedContentTypes: [.data, .json, .item]) { result in
         do { model.dataSelection = try readSelectedFile(result.get()) } catch {
           if (error as NSError).code != NSUserCancelledError {

@@ -44,3 +44,32 @@ Unlock is not consent. Connection, issuer trust, membership and signing decision
 retain their own review. Lock invalidates pending work immediately. iOS cancels
 pending approvals in the background and checks expiry before resuming; automatic
 Touch ID on iPad and button-triggered unlock on iPhone retain their existing rules.
+
+## iOS membership and Castaway entry points
+
+Wallet → Membership displays portable proofs and links directly to Castaway import
+and membership joining/activation. Recovery also names Castaway explicitly.
+Importing data merges into the existing Wallet identity; it never replaces its
+keys or activates membership. A proof-bearing file must pass the existing
+Wallet Core verification against separately approved issuer trust.
+
+Settings → Membership provider can import a bounded public JSON configuration
+using the same shape as the optional bundled Membership.json. Review the exact
+HTTPS endpoint, scope and public issuer roots before choosing Use provider
+settings. This saves only public application configuration in the app preferences,
+outside Wallet exports. It does not approve trust, send identity, or join. Trust
+approval and Join/Use saved membership remain separate actions. Unknown top-level
+fields, duplicate keys, oversized files and credential-bearing URLs are rejected.
+No configuration or issuer key is learned automatically from a Castaway file.
+
+The native request flow does not require community membership when DevGraph
+advertises membership as optional. Base v3 membership and scoped v4 community
+membership retain their existing formats and are never silently promoted.
+
+## iOS verification during network restoration
+
+A saved private Work connection waits for the embedded Tailscale route. Both the
+Work list and its access screen re-verify when network generation/readiness
+changes. The verification failure screen retains network/reconnect controls and
+displays the specific network or URL error when known. It preserves original
+requests and never falls back to the device’s direct HTTP route.

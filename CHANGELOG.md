@@ -1,3 +1,10 @@
+## Connection recovery and membership restore — build 44 candidate
+
+- Resume Work verification when embedded Tailscale becomes ready and show network recovery on the verification screen.
+- Expose Castaway import and membership activation from Wallet → Membership.
+- Review public membership-provider configuration without rebuilding; issuer trust and joining remain separate explicit actions.
+- Preserve Wallet identity, original requests, grants and existing connection settings.
+
 ## Credential-request clarity — build 43 candidate
 
 - Separate requesting credentials from enrolling existing read access.

@@ -2,6 +2,13 @@ import SwiftUI
 import ZenithKit
 
 @MainActor
+private func workConnectionLoadKey(_ model: WalletModel) -> String {
+  let network = model.workServer?.network == .tailscale
+    ? "\(model.privateNetwork.generation):\(model.privateNetwork.phase == .connected)" : "direct"
+  return "\(model.generation):\(network)"
+}
+
+@MainActor
 func workClient(_ model: WalletModel) async -> DevgraphReadClient? {
   guard let configuration = model.workServer,
     let repository = model.repository, !model.paused, !model.obscured
@@ -22,7 +29,13 @@ func workClient(_ model: WalletModel) async -> DevgraphReadClient? {
     return try DevgraphReadClient(repository: repository, configuration: resolved, transport: transport)
   } catch {
     guard !Task.isCancelled, version == model.generation else { return nil }
-    model.error = "Could not verify this service connection. Your server and original requests are preserved."
+    if let networkError = error as? PrivateNetworkError {
+      model.error = networkError.localizedDescription
+    } else if let urlError = error as? URLError {
+      model.error = WorkConnectionFailure(code: urlError.code, network: configuration.network).localizedDescription
+    } else {
+      model.error = "Could not verify this service connection. Your server and original requests are preserved."
+    }
     return nil
   }
 }
@@ -42,6 +55,11 @@ struct WorkAccessView: View {
   @State private var changingServer = false
   @State private var membershipSetup = false
   @Environment(\.dismiss) private var dismiss
+  // Reconnection readiness changes after the network generation changes.
+  // Include both so an early verification is retried once the route is ready.
+  private var connectionLoadKey: String {
+    workConnectionLoadKey(model)
+  }
   var body: some View {
     Group {
       if let client {
@@ -232,12 +250,15 @@ struct WorkAccessView: View {
           }
       } else if let configuration = model.workServer {
         Form {
+          WorkConnectionSection(configuration: configuration, busy: model.busy)
           Section("Saved Work connection") {
-            Text(configuration.name)
-            Text(configuration.origin).font(.caption).foregroundStyle(.secondary)
             if let error = model.error { Text(error).foregroundStyle(.red) }
+            else if configuration.network == .tailscale && privateNetwork.phase != .connected {
+              Text("Connect Tailscale above. Service verification resumes when the private network is ready.")
+            }
             else { ProgressView("Verifying connection") }
             Button("Retry connection") { model.error = nil; model.generation += 1 }
+              .disabled(configuration.network == .tailscale && privateNetwork.phase != .connected)
             Button("Change connection") { changingServer = true }
           }
         }.navigationTitle("Work access")
@@ -273,14 +294,23 @@ struct WorkAccessView: View {
           }
         }
       }
-    }.task(id: model.generation) {
+    }.task(id: connectionLoadKey) {
       client?.cancel()
+      client = nil
       proposal = nil
       holderReview = nil
       current = nil
       requestResult = nil; editingRequest = false
       reusableAvailable = false
-      client = await workClient(model)
+      if model.workServer?.network == .tailscale && privateNetwork.phase != .connected {
+        model.error = nil
+        return
+      }
+      let attempt = connectionLoadKey
+      model.error = nil
+      let loaded = await workClient(model)
+      guard !Task.isCancelled, attempt == connectionLoadKey else { loaded?.cancel(); return }
+      client = loaded
       let version = model.generation
       let supports = (try? await client?.supportsReusableGrants()) == true
       let manifest = try? await client?.manifest()
@@ -410,12 +440,10 @@ struct NativeWorkView: View {
             }.navigationTitle("Filters").toolbar { Button("Done") { filters = false } }
           }
         }
-        .task(id: model.generation) { await reload() }
-    }
-    .onChange(of: privateNetwork.phase) { _, phase in
-      if phase == .connected, model.workServer?.network == .tailscale {
-        Task { await loadMore() }
-      }
+        .task(id: workConnectionLoadKey(model)) {
+          if model.workServer?.network == .tailscale && privateNetwork.phase != .connected { return }
+          await reload()
+        }
     }
     .onChange(of: privateNetwork.generation) { _, _ in
       if model.workServer?.network == .tailscale {
@@ -438,7 +466,10 @@ struct NativeWorkView: View {
     detailKinds = []
     hasArenas = false
     error = nil
-    client = await workClient(model)
+    let attempt = workConnectionLoadKey(model)
+    let loaded = await workClient(model)
+    guard !Task.isCancelled, attempt == workConnectionLoadKey(model) else { loaded?.cancel(); return }
+    client = loaded
     loading = false
     let version = model.generation
     do {

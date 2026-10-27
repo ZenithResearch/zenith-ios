@@ -32,7 +32,7 @@ struct RestoreDataAttachmentSheet: View {
           } else {
             WalletSelectedFile(title: name, detail: "Castaway data", change: { file = nil; password = "" })
             WalletPasswordField(title: "Data file password", text: $password)
-            if let configuration = MembershipConfiguration.bundled() {
+            if let configuration = MembershipConfiguration.proposed() {
               DisclosureGroup("Membership proof provider") {
                 VStack(alignment: .leading, spacing: 12) {
                   Text(configuration.name)

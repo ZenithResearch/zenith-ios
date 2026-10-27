@@ -36,7 +36,7 @@ struct RecoveryView: View {
         NavigationLink("Check a saved backup") { BackupFlowView(isOnboarding: false, startsChecking: true) }
       }
       Section {
-        NavigationLink("Import or save a data file") { DataFileView() }
+        NavigationLink("Import or save Castaway data") { DataFileView() }
       }
     }.navigationTitle("Recovery")
   }

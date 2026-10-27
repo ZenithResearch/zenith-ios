@@ -124,7 +124,7 @@ struct WalletView: View {
         .navigationDestination(for: WalletDestination.self) { destination in
           switch destination {
           case .identities: PortableWalletIdentitiesView(repository: model.repository, unlocked: model.state?.unlocked == true, legacy: model.identityAccounts, changed: { Task { await model.load() } })
-          case .membership: WalletMembershipContent(repository: model.repository, unlocked: model.state?.unlocked == true)
+          case .membership: WalletMembershipScreen()
           case .recovery: RecoveryView()
           case .access: ScrollView { WalletGrantsView(repository:model.repository,unlocked:model.state?.unlocked == true) }
           case .security: WalletSecurityView()
