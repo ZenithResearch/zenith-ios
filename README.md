@@ -48,7 +48,7 @@ Use the selected phone's identifier and approved team ID for these variables. A 
 
 The phone has its own wallet storage. Installing the app does not copy Simulator custody. Create a disposable wallet or explicitly restore its encrypted recovery file through the app. Membership and work access still require the separate configuration and approval below. Successful installation is not completion of the physical-device qualification checklist.
 
-When packaging an existing device build separately, sign every embedded Mach-O
+When repackaging an existing sealed device build, sign every embedded Mach-O
 before signing the outer app. Debug builds can include top-level
 `Zenith.debug.dylib` and `__preview.dylib`; an outer
 `codesign --verify --deep --strict` check alone can pass while those libraries
@@ -61,7 +61,8 @@ python3 scripts/package-ios-app.py --source-app "$ZENITH_SOURCE_APP" \
 python3 scripts/package-ios-app.py --source-app "$ZENITH_OUTPUT_APP" --verify-only
 ```
 
-The packager preserves the source app's provisioning profile, app identity and
+The packager rejects a changed source seal or external symbolic links before
+signing. It preserves the source app's provisioning profile, app identity and
 entitlements, including Keychain groups, and verifies each embedded executable
 against the provisioning team. After installing in place, verify that the app
 stays running and displays its UI; a successful launch-command response alone

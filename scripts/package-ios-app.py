@@ -42,7 +42,14 @@ def entitlements(app):
     return plistlib.loads(run("codesign", "-d", "--entitlements", ":-", str(app)).stdout)
 
 
+def internal_links(app):
+    for path in app.rglob("*"):
+        if path.is_symlink() and not path.resolve(strict=True).is_relative_to(app):
+            raise RuntimeError("Application contains an external symbolic link")
+
+
 def verify(app, expected_entitlements=None):
+    internal_links(app)
     profile = plistlib.loads(run("security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")).stdout)
     team = profile["TeamIdentifier"][0]
     if profile["ExpirationDate"].replace(tzinfo=datetime.timezone.utc) <= datetime.datetime.now(datetime.timezone.utc):
@@ -63,6 +70,9 @@ def verify(app, expected_entitlements=None):
     if actual.get("com.apple.developer.team-identifier") != team:
         raise RuntimeError("Application team does not match its provisioning profile")
     app_id = actual.get("application-identifier", "")
+    bundle_id = plistlib.loads((app / "Info.plist").read_bytes())["CFBundleIdentifier"]
+    if not app_id.endswith("." + bundle_id):
+        raise RuntimeError("Application identity does not match its bundle identifier")
     admitted = profile["Entitlements"]["application-identifier"]
     if not (app_id == admitted or admitted.endswith("*") and app_id.startswith(admitted[:-1])):
         raise RuntimeError("Application identity does not match its provisioning profile")
@@ -91,9 +101,15 @@ def main():
         raise RuntimeError("Output exists; preserve it and select a new build path")
     if any(p.suffix in (".appex", ".app") for p in app.rglob("*") if p.is_dir()):
         raise RuntimeError("Nested applications/extensions require their own explicit entitlement plan")
+    internal_links(app)
+    # The original seal binds the previously qualified build's resource bytes,
+    # including any unsigned debug dylibs. Do not bless a modified source app.
+    run("codesign", "--verify", "--deep", "--strict", str(app))
     original_entitlements = entitlements(app)
     original_info = plistlib.loads((app / "Info.plist").read_bytes())
     shutil.copytree(app, output, symlinks=True)
+    internal_links(output)
+    run("codesign", "--verify", "--deep", "--strict", str(output))
     info = dict(original_info, CFBundleVersion=args.build_number)
     (output / "Info.plist").write_bytes(plistlib.dumps(info))
     executable = output / info["CFBundleExecutable"]
@@ -106,14 +122,17 @@ def main():
     entitlement_file = output.parent / (output.name + ".signing-entitlements.plist")
     if entitlement_file.exists():
         raise RuntimeError("Signing scratch already exists")
+    created_entitlement_file = False
     try:
         with entitlement_file.open("xb") as stream:
+            created_entitlement_file = True
             entitlement_file.chmod(0o600)
             stream.write(plistlib.dumps(original_entitlements))
         run("codesign", "--force", "--sign", args.identity, "--timestamp=none",
             "--generate-entitlement-der", "--entitlements", str(entitlement_file), str(output))
     finally:
-        entitlement_file.unlink(missing_ok=True)
+        if created_entitlement_file:
+            entitlement_file.unlink(missing_ok=True)
     if (output / "embedded.mobileprovision").read_bytes() != (app / "embedded.mobileprovision").read_bytes():
         raise RuntimeError("Provisioning profile changed")
     result = verify(output, original_entitlements)
