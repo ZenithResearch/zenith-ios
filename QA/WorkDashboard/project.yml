@@ -1,0 +1,30 @@
+name: WorkDashboardReview
+options:
+  deploymentTarget:
+    iOS: '18.1'
+packages:
+  ZenithKit:
+    path: ../..
+targets:
+  WorkDashboardReview:
+    type: application
+    platform: iOS
+    sources:
+      - path: WorkDashboardReviewApp.swift
+      - path: ../../App/WorkDashboardView.swift
+    dependencies:
+      - package: ZenithKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ca.zenith.preview.work-dashboard-review
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Zenith Work Review
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+        SWIFT_VERSION: '5.9'
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  WorkDashboardReview:
+    build:
+      targets:
+        WorkDashboardReview: all

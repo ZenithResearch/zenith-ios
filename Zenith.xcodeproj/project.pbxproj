@@ -39,6 +39,7 @@
 		DCA90E57902FCC473DCCFE99 /* CastaliaWalletPresentation-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */; };
 		EA036C48C0EDB9C6D1FD4D3D /* HermesChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 845B9719E8A4CB3429589DF2 /* HermesChatView.swift */; };
 		EF345F79289867DB2FDF5D35 /* PrivateNetworkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */; };
+		EFDF673FD1C420EBB37578FB /* WorkDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73CFFABEE77694980A850528 /* WorkDashboardView.swift */; };
 		F49AA0B72CCF52924713ECF2 /* ManualWorkServerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3825917F2FA239089D3FE6EA /* ManualWorkServerView.swift */; };
 		F52B9A16207931FB7338E715 /* WalletIdentitiesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26517D482F44F370B9B310F8 /* WalletIdentitiesView.swift */; };
 		FF439BAE64F19AFFE654BD25 /* Tailscale-dependencies.txt in Resources */ = {isa = PBXBuildFile; fileRef = 87B36526577727B84F5CB335 /* Tailscale-dependencies.txt */; };
@@ -64,7 +65,6 @@
 		26517D482F44F370B9B310F8 /* WalletIdentitiesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletIdentitiesView.swift; sourceTree = "<group>"; };
 		2665A3220865F225B1C05772 /* RestoreDataAttachmentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreDataAttachmentSheet.swift; sourceTree = "<group>"; };
 		2D1D0E3CECE6EA6F4D201606 /* CastaliaWalletCore-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletCore-MIT.txt"; sourceTree = "<group>"; };
-		2F3F58A4D28AAF4148A52A90 /* zenith-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "zenith-ios"; path = .; sourceTree = SOURCE_ROOT; };
 		3825917F2FA239089D3FE6EA /* ManualWorkServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualWorkServerView.swift; sourceTree = "<group>"; };
 		3BE4AC41C74ACC7C59E07417 /* CastaliaWalletPresentation-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "CastaliaWalletPresentation-MIT.txt"; sourceTree = "<group>"; };
 		442D81CC67F7BEC92EA98E90 /* Zenith.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zenith.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -72,7 +72,9 @@
 		4C9F0739DBA68F7CED34126A /* PrivateNetworkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateNetworkView.swift; sourceTree = "<group>"; };
 		4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkAccessRequestSection.swift; sourceTree = "<group>"; };
 		58F28FE66495D39285938EBB /* CreateWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateWalletFlow.swift; sourceTree = "<group>"; };
+		5BE6D9AA29392BB14A4C157D /* work-dashboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "work-dashboard"; path = .; sourceTree = SOURCE_ROOT; };
 		5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleDriver.swift; sourceTree = "<group>"; };
+		73CFFABEE77694980A850528 /* WorkDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkDashboardView.swift; sourceTree = "<group>"; };
 		79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkServerDraft.swift; sourceTree = "<group>"; };
 		7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkServerSetupView.swift; sourceTree = "<group>"; };
 		816148DAF0ACAFA83EE9439E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -186,7 +188,7 @@
 		F26A81E05E920BD19EE16246 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				2F3F58A4D28AAF4148A52A90 /* zenith-ios */,
+				5BE6D9AA29392BB14A4C157D /* work-dashboard */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -211,6 +213,7 @@
 				4E4E884214737BD85228690C /* WorkAccessRequestSection.swift */,
 				E6081C53E6AF8DB1C8C23BC9 /* WorkAccessViews.swift */,
 				A991E568D963A960C0F62136 /* WorkConnectionSection.swift */,
+				73CFFABEE77694980A850528 /* WorkDashboardView.swift */,
 				79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */,
 				7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */,
 				BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */,
@@ -324,6 +327,7 @@
 				75CECC4EE61881B98D3CD447 /* WorkAccessRequestSection.swift in Sources */,
 				A499666A319A90C01679D64D /* WorkAccessViews.swift in Sources */,
 				45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */,
+				EFDF673FD1C420EBB37578FB /* WorkDashboardView.swift in Sources */,
 				2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */,
 				77426BE1161C6AD8936723D2 /* WorkServerSetupView.swift in Sources */,
 				1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */,

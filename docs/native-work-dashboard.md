@@ -1,0 +1,48 @@
+# Native Work page
+
+The Work tab contains Project Pulse, Activity and Todo on one native page.
+iPhone stacks one-item previews with section jump links, an inline navigation
+title, and See all navigation. iPad shows two-item previews.
+At widths of 760 points or more, Pulse sits beside Activity and Todo. Large
+accessibility text returns to the single-column layout. System grouped surfaces,
+Dynamic Type, segmented pickers, NavigationStack, and searchable expanded lists
+follow the existing iOS app. There is no personal-focus mode or project icon.
+
+Arenas and Initiatives are context filters above the permanent project list.
+Projects rank by the latest valid update in the project or its loaded descendants.
+Activity previews Issues, with a separate project filter. Todo remains independently
+ordered by recorded priority and includes only not-started Tasks. Opening a Work
+record uses the existing authorized detail reader. Loaded children are shown before
+a collapsible description. Capture expands inline at the bottom of the page and preserves its draft when
+closed. It is explicit page-memory text, not a Work write. A separate All shared
+work list keeps other permitted Work kinds reachable.
+
+The loader preserves the current Wallet-approved read client and its permission,
+expiry, lifecycle and private-network checks. All graph state is read through the
+existing SDK. Arena membership is loaded only under explicit Arena get permission.
+Pagination remains bounded; counts and order describe loaded items. Unshared or
+unfinished membership is not inferred from project titles or working directories.
+
+## Additive consumer compatibility
+
+`WorkRecord` now reads the optional `parent` and `updated_at` fields already emitted
+by canonical `todo_summary` (`devgraph.todos.v2`). Legacy native-v2 summaries that
+omit them still decode. Unknown or invalid dates cannot imply freshness; malformed
+parent keys fail closed. This is an additive consumer change with no producer,
+permission schema, credential, persisted request, or service deployment change.
+
+## Capability limits
+
+The native v2–v6 read protocols list Work and Arena resources, but do not expose
+session-ref reads or session-state writes. The Sessions segment states that this
+connection lacks that route. It does not call the prototype's private loopback
+companion or present record timestamps as session activity. Activity defaults to
+Issues and labels its ordering as record activity. Native session capabilities
+need a separately coordinated producer/permission/client change; existing grants
+are never expanded by this UI.
+
+The native read projection also supplies no compatible versioned complexity
+estimates. Project complexity therefore remains Unestimated, without a guessed
+percentage, completion bar, or velocity. Recorded Task Done does not imply accepted
+delivery. The isolated QA app verifies presentation with synthetic data; it does
+not demonstrate live server or session connectivity.

@@ -226,3 +226,11 @@ dated cache for every run.
 Read scope/result v5 adds Arena metadata separately from Work. The native client retains explicit Arena IDs when a grant is saved, reloaded and used to derive an equal or narrower same-Wallet credential. Older Work-only formats remain supported without gaining Arena access. Work shows **Shared Arenas** only when its credential includes Arena list; details require Arena get. Arena-member reads additionally require independent Work list authority from the same credential and are filtered by the server before pagination.
 
 The provider’s existing owner ceiling must explicitly enable Arena records before an operator can issue them. Changing a Work hierarchy scope or installing this build does not expand that ceiling or any existing grant.
+
+
+## Work dashboard
+
+The native Work tab groups Project Pulse, Activity and Todo on one adaptive page,
+with compact iPhone previews and side-by-side iPad panels. See
+[behavior, native API limits and compatibility](docs/native-work-dashboard.md),
+and the [isolated simulator review](QA/WorkDashboard/README.md).

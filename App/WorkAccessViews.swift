@@ -361,6 +361,7 @@ struct NativeWorkView: View {
   @EnvironmentObject private var model: WalletModel
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @State private var client: DevgraphReadClient?
+  @State private var loadEpoch = UUID()
   @State private var rows: [WorkRecord] = []
   @State private var hasArenas = false
   @State private var cursors: [String: WorkPageCursor] = [:]
@@ -369,78 +370,59 @@ struct NativeWorkView: View {
   @State private var detailKinds: Set<String> = []
   @State private var error: String?
   @State private var loading = false
-  @State private var filters = false
   @State private var connection = false
   @EnvironmentObject private var draft: WorkServerDraft
-  @State private var search = ""
-  @AppStorage("workKindFilter") private var kind = "All types"
-  private var visible: [WorkRecord] {
-    rows.filter {
-      (kind == "All types" || $0.kind == kind)
-        && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search))
-    }
+  @State private var arenaRows: [ArenaRecord] = []
+  @State private var arenaMembers: [String: Set<String>] = [:]
+  @State private var arenaContextComplete = false
+  @State private var capture = false
+  @State private var captureText = ""
+  @FocusState private var captureFocused: Bool
+  @State private var captures: [String] = []
+  private var dashboard: WorkDashboard {
+    WorkDashboard(records: rows, arenas: arenaRows, members: arenaMembers,
+      complete: Set(["Initiative", "Project", "Issue", "Task"]).isSubset(of: Set(allowed))
+        && Set(allowed).isSubset(of: finished), arenaMembershipComplete: arenaContextComplete)
   }
   var body: some View {
     NavigationStack {
-      List {
-        if hasArenas {
-          NavigationLink { NativeArenaListView() } label: {
-            Label("Shared Arenas", systemImage: "square.stack.3d.up")
-          }
-        }
-        if rows.isEmpty && !loading && !hasArenas {
-          if let error {
-            Text(error)
-          } else {
-            Text("Connect read-only work access to see your items.")
-          }
-        }
-        if rows.isEmpty && !loading {
-          NavigationLink("Set up work connection") { WorkAccessView() }
-        }
-        ForEach(visible, id: \.rowID) { row in
-          NavigationLink {
-            NativeWorkDetailView(row: row, canRead: detailKinds.contains(row.kind))
-          } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(row.title)
-              Text(row.kind + " · " + row.progressLabel).font(.caption).foregroundStyle(.secondary)
-            }.padding(.vertical, 4)
-          }
-        }
-        if loading {
-          ProgressView("Loading work")
-        } else if !allowed.isEmpty && !Set(allowed).isSubset(of: finished) {
-          Button("Load more") { Task { await loadMore() } }
-        }
-        if !rows.isEmpty, let error { Text(error) }
-      }.navigationTitle("Work")
-        .searchable(text: $search, prompt: "Search loaded work")
-        .refreshable {
-          rows = []
-          cursors = [:]
-          finished = []
-          await loadMore()
-        }
+      WorkDashboardView(snapshot: dashboard, loading: loading,
+        message: error ?? (rows.isEmpty && !loading ? "Connect Work to see your shared projects, activity and tasks." : nil),
+        loadMore: !allowed.isEmpty && !Set(allowed).isSubset(of: finished) ? { Task { await loadMore() } } : nil,
+        destination: { row in AnyView(NativeWorkDetailView(row: row,
+          canRead: detailKinds.contains(row.kind), loadedContext: dashboard, detailKinds: detailKinds)) },
+        arenaDestination: { arena in AnyView(NativeArenaDetailView(id: arena.id)) })
+        .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
+        .refreshable { await reload() }
         .toolbar {
           ToolbarItem(placement: .topBarLeading) {
             Button("Connection", systemImage: "network") { connection = true }
               .accessibilityIdentifier("work.connection.settings")
           }
-          ToolbarItem(placement: .topBarTrailing) {
-            Button("Filters", systemImage: "line.3.horizontal.decrease") { filters = true }
-          }
+          ToolbarItem(placement: .topBarTrailing) { Button("Capture") { capture = true } }
         }
         .navigationDestination(isPresented: $connection) { WorkAccessView() }
         .onAppear { if draft.active { connection = true } }
-        .sheet(isPresented: $filters) {
-          NavigationStack {
-            Form {
-              Picker("Type", selection: $kind) {
-                Text("All types").tag("All types")
-                ForEach(allowed, id: \.self) { Text($0).tag($0) }
+        .safeAreaInset(edge: .bottom) {
+          if capture {
+            VStack(alignment: .leading, spacing: 8) {
+              HStack(alignment: .bottom, spacing: 12) {
+                TextField("Capture a thought", text: $captureText, axis: .vertical)
+                  .lineLimit(1...5).textFieldStyle(.roundedBorder).focused($captureFocused)
+                  .onAppear { captureFocused = true }
+                Button("Save") {
+                  captures.insert(captureText.trimmingCharacters(in: .whitespacesAndNewlines), at: 0)
+                  captureText = ""; captureFocused = false; capture = false
+                }.disabled(captureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Close") { captureFocused = false; capture = false }
               }
-            }.navigationTitle("Filters").toolbar { Button("Done") { filters = false } }
+              Text("Page memory only · no task created").font(.caption2).foregroundStyle(.secondary)
+              if !captures.isEmpty {
+                DisclosureGroup("Captured here (\(captures.count))") {
+                  ForEach(Array(captures.enumerated()), id: \.offset) { _, text in Text(text).font(.footnote) }
+                }.font(.caption)
+              }
+            }.padding().background(.bar)
           }
         }
         .task(id: workConnectionLoadKey(model)) {
@@ -450,17 +432,15 @@ struct NativeWorkView: View {
     }
     .onChange(of: privateNetwork.generation) { _, _ in
       if model.workServer?.network == .tailscale {
-        client?.cancel()
-        rows = []
-        cursors = [:]
-        finished = []
-        loading = false
+        client?.cancel(); rows = []; arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
+        cursors = [:]; finished = []; loading = false
         error = "Private connection changed. Open Connection to reconnect."
       }
     }
     .onDisappear { client?.cancel() }
   }
   private func reload() async {
+    let epoch = UUID(); loadEpoch = epoch
     client?.cancel()
     rows = []
     cursors = [:]
@@ -468,25 +448,64 @@ struct NativeWorkView: View {
     allowed = []
     detailKinds = []
     hasArenas = false
+    arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
     error = nil
     let attempt = workConnectionLoadKey(model)
     let loaded = await workClient(model)
-    guard !Task.isCancelled, attempt == workConnectionLoadKey(model) else { loaded?.cancel(); return }
+    guard !Task.isCancelled, epoch == loadEpoch, attempt == workConnectionLoadKey(model) else { loaded?.cancel(); return }
     client = loaded
     loading = false
     let version = model.generation
     do {
       if let manifest = try await client?.manifest() {
-        guard !Task.isCancelled, version == model.generation else { return }
+        guard !Task.isCancelled, epoch == loadEpoch, version == model.generation else { return }
         configurePermissions(manifest)
-        if !allowed.contains(kind) { kind = "All types" }
         if rows.isEmpty { await loadMore() }
+        await loadArenaContext(manifest)
       }
     } catch {
-      guard !Task.isCancelled, version == model.generation else { return }
+      guard !Task.isCancelled, epoch == loadEpoch, version == model.generation else { return }
       self.error = "Work access needs setup or has expired. Open Work access in Wallet."
     }
 
+  }
+  private func loadArenaContext(_ manifest: NativeReadManifest) async {
+    guard hasArenas, let client else { return }
+    let generation = model.generation, network = privateNetwork.generation, epoch = loadEpoch
+    func current() -> Bool { !Task.isCancelled && epoch == loadEpoch && generation == model.generation &&
+      (client.connection.network != .tailscale || network == privateNetwork.generation) }
+    do {
+      var after: String?
+      for _ in 0..<5 {
+        let page = try await client.arenas(after: after)
+        guard current() else { return }
+        guard Set(arenaRows.map(\.id)).isDisjoint(with: page.items.map(\.id)) else { throw WalletFailure.core("invalid_response") }
+        arenaRows += page.items; after = page.next
+        if after == nil { break }
+      }
+      var complete = after == nil
+      for arena in arenaRows {
+        let permitted = manifest.read_grants.contains { $0.isArena && $0.operations.contains("get") && ($0.all_arenas == true || ($0.arena_ids ?? []).contains(arena.id)) }
+        guard permitted else { complete = false; continue }
+        var cursor: WorkPageCursor?
+        for _ in 0..<10 {
+          let page = try await client.arenaMembers(id: arena.id, after: cursor)
+          guard current() else { return }
+          arenaMembers[arena.id, default: []].formUnion(page.items.map(\.rowID))
+          let existing = Set(rows.map(\.rowID))
+          rows += page.items.filter { !existing.contains($0.rowID) }
+          cursor = page.next
+          if cursor == nil { break }
+        }
+        if cursor != nil { complete = false }
+      }
+      guard current() else { return }
+      arenaContextComplete = complete
+    } catch {
+      guard current() else { return }
+      if invalidatesWorkAccess(error) { rows = []; arenaRows = []; arenaMembers = [:]; allowed = [] }
+      self.error = "Arena context could not finish loading. Open Connection to check access."
+    }
   }
   private func configurePermissions(_ manifest: NativeReadManifest) {
     let grants: [WorkReadGrant] = manifest.read_grants
@@ -500,11 +519,11 @@ struct NativeWorkView: View {
     guard !loading, let client else { return }
     loading = true
     error = nil
-    let version = model.generation
+    let version = model.generation, epoch = loadEpoch
     let usesPrivateNetwork = client.connection.network == .tailscale
     let networkVersion = privateNetwork.generation
     func current() -> Bool {
-      version == model.generation
+      epoch == loadEpoch && version == model.generation
         && (!usesPrivateNetwork || networkVersion == privateNetwork.generation)
     }
     defer { if current() { loading = false } }
@@ -513,16 +532,15 @@ struct NativeWorkView: View {
         let page = try await client.page(kind: type, after: cursors[type])
         guard current(), !Task.isCancelled else { return }
         if let next = page.next { cursors[type] = next } else { finished.insert(type) }
-        let existing = Set(rows.map(\.rowID))
-        guard page.items.allSatisfy({ !existing.contains($0.rowID) }) else {
-          throw WalletFailure.core("invalid_response")
+        for item in page.items {
+          if let index = rows.firstIndex(where: { $0.rowID == item.rowID }) { rows[index] = item }
+          else { rows.append(item) }
         }
-        rows.append(contentsOf: page.items)
       }
     } catch {
       if current() {
         if invalidatesWorkAccess(error) {
-          rows = []
+          rows = []; arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
           cursors = [:]
           finished = []
           allowed = []
@@ -538,6 +556,8 @@ struct NativeWorkView: View {
 struct NativeWorkDetailView: View {
   let row: WorkRecord
   let canRead: Bool
+  var loadedContext: WorkDashboard? = nil
+  var detailKinds: Set<String> = []
   @EnvironmentObject private var model: WalletModel
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
   @State private var record: WorkRecord?
@@ -551,7 +571,23 @@ struct NativeWorkDetailView: View {
           Text(record.kind).foregroundStyle(.secondary)
           Text(record.title).font(.title2.bold())
           Text(record.progressLabel).font(.subheadline)
-          Text(record.description).textSelection(.enabled)
+          if let context = loadedContext {
+            let children = context.records.filter { $0.parent == record.rowID }
+            if !children.isEmpty {
+              Text("Loaded related work").font(.headline)
+              ForEach(context.recent(children), id: \.rowID) { child in
+                NavigationLink {
+                  NativeWorkDetailView(row: child, canRead: detailKinds.contains(child.kind), loadedContext: context, detailKinds: detailKinds)
+                } label: {
+                  VStack(alignment: .leading, spacing: 4) {
+                    Text(child.title).font(.subheadline)
+                    Text(child.progressLabel).font(.caption).foregroundStyle(.secondary)
+                  }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+              }
+            }
+          }
+          DisclosureGroup("Description") { Text(record.description).textSelection(.enabled) }
           if !canRead {
             Text(
               "Your access includes this summary. Full item details need separate read permission."

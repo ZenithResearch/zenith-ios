@@ -188,8 +188,11 @@ public struct WorkRecord: Decodable, Identifiable, Sendable {
   public let priority: Int
   public let version: Int
   public let progress: String?
+  /// Optional in older native-v2 summaries. Never infer hierarchy from titles.
+  public let parent: String?
+  public let updated_at: String?
   enum CodingKeys: String, CodingKey {
-    case kind, id, title, description, priority, version, progress
+    case kind, id, title, description, priority, version, progress, parent, updated_at
   }
   public init(from decoder: Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -208,6 +211,13 @@ public struct WorkRecord: Decodable, Identifiable, Sendable {
     priority = try integer(.priority)
     version = try integer(.version)
     progress = try values.decodeIfPresent(String.self, forKey: .progress)
+    parent = try values.decodeIfPresent(String.self, forKey: .parent)
+    updated_at = try values.decodeIfPresent(String.self, forKey: .updated_at)
+    if let parent {
+      let pair = parent.split(separator: "/", omittingEmptySubsequences: false)
+      guard pair.count == 2, WorkReadProtocol.monitorV3.workKinds.contains(String(pair[0])),
+        validWorkID(String(pair[1])) else { throw WalletFailure.core("invalid_response") }
+    }
     guard WorkReadProtocol.monitorV3.workKinds.contains(kind), validWorkID(id) else {
       throw WalletFailure.core("invalid_response")
     }
