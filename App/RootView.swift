@@ -10,11 +10,11 @@ struct RootView: View {
         if let state = model.state {
           if !state.configured {
             WelcomeView()
-          } else if !state.unlocked {
+          } else if !state.unlocked && !model.hasWorkSession {
             UnlockView()
           } else if model.onboardingCompletion != nil {
             WalletReadyView()
-          } else if !state.backupVerified {
+          } else if state.unlocked && !state.backupVerified {
             NavigationStack { BackupFlowView(isOnboarding: true) }
           } else {
             TabView(selection: $destination) {
@@ -115,12 +115,15 @@ private struct WalletStartChoice: View {
 struct WalletView: View {
   @EnvironmentObject private var model: WalletModel
   @State private var path: [WalletDestination] = []
+  @State private var unlocking = false
   var body: some View {
     NavigationStack(path: $path) {
       WalletHomeContent(publicKey: model.state?.publicKey, unlocked: model.state?.unlocked == true,
         backupVerified: model.state?.backupVerified == true, membershipActive: model.state?.membershipActive == true,
         accessSummary: "",
         open: { path.append($0) }, lock: model.suspend)
+        .toolbar { if model.state?.unlocked != true { Button("Unlock Wallet") { unlocking = true } } }
+        .sheet(isPresented: $unlocking) { UnlockView() }
         .navigationDestination(for: WalletDestination.self) { destination in
           switch destination {
           case .identities: PortableWalletIdentitiesView(repository: model.repository, unlocked: model.state?.unlocked == true, legacy: model.identityAccounts, changed: { Task { await model.load() } })

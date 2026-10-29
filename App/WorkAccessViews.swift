@@ -19,7 +19,8 @@ func workClient(_ model: WalletModel) async -> DevgraphReadClient? {
     var resolved = try await configuration.resolveService(transport: transport)
     // An original request issued to a legacy inbox must be recovered there.
     // Its signed identity/receiver is never rewritten to adopt another inbox.
-    if resolved.authorityOrigin != configuration.origin, let store = model.accessRequestStore,
+    let sessionReady = (try? await HolderSessionRegistry.shared.challenge(configuration: resolved)) != nil
+    if !sessionReady, resolved.authorityOrigin != configuration.origin, let store = model.accessRequestStore,
        let identity = try JSONSerialization.jsonObject(with: await repository.graphAccessIdentityV2()) as? [String:String],
        let subject = identity["subject_public_key"], let installation = identity["installation_id"],
        try store.existing(receiver: configuration.origin, subject: subject, installation: installation) != nil {
@@ -66,6 +67,10 @@ struct WorkAccessView: View {
         Form {
           WorkConnectionSection(configuration: client.connection, busy: model.busy).id(
             model.generation)
+          Section("Application session") {
+            NavigationLink("Review session access") { WorkSessionReview(client: client) }
+            Text("Use a saved reusable grant to approve short-lived Work access. Your root Wallet can lock while this session continues; its expiry never slides.").font(.footnote)
+          }
           if let holderReview {
             Section("Save reusable grant") { HolderGrantSummaryView(summary: holderReview.summary) }
             Section {
@@ -136,6 +141,14 @@ struct WorkAccessView: View {
                     grantRecovery = false
                   }
                 }.buttonStyle(.borderedProminent).disabled(model.busy)
+                Button("Request session-ready reusable grant") {
+                  model.perform({ _ in
+                    do { return try await client.requestReusableGrant(proposal, preferSessionGrant: true) } catch {
+                      grantRecovery = await client.hasPendingReusableGrant(); throw error
+                    }
+                  }) { holderReview = $0; grantRecovery = false }
+                }.disabled(model.busy)
+                Text("Uses the service’s advertised version 2 grant endpoint. You review the provider-signed grant before saving it; current permissions do not change.").font(.footnote)
                 Text(
                   "Review the provider-signed grant before saving it. A saved grant lets this Wallet produce its own credentials within the same or a narrower scope."
                 ).font(.footnote)
