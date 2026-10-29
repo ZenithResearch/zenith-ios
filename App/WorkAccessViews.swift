@@ -377,7 +377,6 @@ struct NativeWorkView: View {
   @State private var arenaContextComplete = false
   @State private var capture = false
   @State private var captureText = ""
-  @FocusState private var captureFocused: Bool
   @State private var captures: [String] = []
   private var dashboard: WorkDashboard {
     WorkDashboard(records: rows, arenas: arenaRows, members: arenaMembers,
@@ -391,7 +390,8 @@ struct NativeWorkView: View {
         loadMore: !allowed.isEmpty && !Set(allowed).isSubset(of: finished) ? { Task { await loadMore() } } : nil,
         destination: { row in AnyView(NativeWorkDetailView(row: row,
           canRead: detailKinds.contains(row.kind), loadedContext: dashboard, detailKinds: detailKinds)) },
-        arenaDestination: { arena in AnyView(NativeArenaDetailView(id: arena.id)) })
+        arenaDestination: { arena in AnyView(NativeArenaDetailView(id: arena.id)) },
+        captureText: $captureText, captures: $captures, captureRequested: $capture)
         .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }
         .toolbar {
@@ -403,28 +403,6 @@ struct NativeWorkView: View {
         }
         .navigationDestination(isPresented: $connection) { WorkAccessView() }
         .onAppear { if draft.active { connection = true } }
-        .safeAreaInset(edge: .bottom) {
-          if capture {
-            VStack(alignment: .leading, spacing: 8) {
-              HStack(alignment: .bottom, spacing: 12) {
-                TextField("Capture a thought", text: $captureText, axis: .vertical)
-                  .lineLimit(1...5).textFieldStyle(.roundedBorder).focused($captureFocused)
-                  .onAppear { captureFocused = true }
-                Button("Save") {
-                  captures.insert(captureText.trimmingCharacters(in: .whitespacesAndNewlines), at: 0)
-                  captureText = ""; captureFocused = false; capture = false
-                }.disabled(captureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Button("Close") { captureFocused = false; capture = false }
-              }
-              Text("Page memory only · no task created").font(.caption2).foregroundStyle(.secondary)
-              if !captures.isEmpty {
-                DisclosureGroup("Captured here (\(captures.count))") {
-                  ForEach(Array(captures.enumerated()), id: \.offset) { _, text in Text(text).font(.footnote) }
-                }.font(.caption)
-              }
-            }.padding().background(.bar)
-          }
-        }
         .task(id: workConnectionLoadKey(model)) {
           if model.workServer?.network == .tailscale && privateNetwork.phase != .connected { return }
           await reload()

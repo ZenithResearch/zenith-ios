@@ -3,14 +3,19 @@ import ZenithKit
 
 @main
 struct WorkDashboardReviewApp: App {
+  @State private var captureText = ""
+  @State private var captures: [String] = []
+  @State private var captureRequested = false
   var body: some Scene {
     WindowGroup {
       NavigationStack {
         WorkDashboardView(snapshot: ReviewData.snapshot, loading: false,
           message: "Design review · synthetic Work · no live Wallet or server", loadMore: nil,
           destination: { row in AnyView(ReviewDetail(row: row)) },
-          arenaDestination: { row in AnyView(Text(row.title)) })
+          arenaDestination: { row in AnyView(Text(row.title)) },
+          captureText: $captureText, captures: $captures, captureRequested: $captureRequested)
           .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
+          .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Capture") { captureRequested = true } } }
       }.tint(Color(red: 0.09, green: 0.34, blue: 0.28))
         .dynamicTypeSize(ProcessInfo.processInfo.environment["WORK_REVIEW_LARGE_TEXT"] == "1" ? .accessibility2 : .large)
     }

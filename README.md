@@ -231,6 +231,8 @@ The provider’s existing owner ceiling must explicitly enable Arena records bef
 ## Work dashboard
 
 The native Work tab groups Project Pulse, Activity and Todo on one adaptive page,
-with compact iPhone previews and side-by-side iPad panels. See
+with compact iPhone previews and aligned iPad panels. A roughly 62/38 grid places
+Pulse and Notepad in the primary column, with Activity and Todo alongside. Capture
+focuses the notepad directly; notes stay in page memory. See
 [behavior, native API limits and compatibility](docs/native-work-dashboard.md),
 and the [isolated simulator review](QA/WorkDashboard/README.md).

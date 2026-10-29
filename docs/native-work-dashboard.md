@@ -3,8 +3,12 @@
 The Work tab contains Project Pulse, Activity and Todo on one native page.
 iPhone stacks one-item previews with section jump links, an inline navigation
 title, and See all navigation. iPad shows two-item previews.
-At widths of 760 points or more, Pulse sits beside Activity and Todo. Large
-accessibility text returns to the single-column layout. System grouped surfaces,
+At widths of 760 points or more, two aligned rows use an approximately 62/38
+primary/sidebar split: Pulse beside Activity, then Notepad beside Todo. Each row
+shares a measured height; headers, context tracks, padding and footer baselines
+align. The secondary track stays at least 300 points where space permits, so
+readability takes precedence over an exact ratio. Large accessibility text
+returns to the single-column layout. System grouped surfaces,
 Dynamic Type, segmented pickers, NavigationStack, and searchable expanded lists
 follow the existing iOS app. There is no personal-focus mode or project icon.
 
@@ -13,8 +17,11 @@ Projects rank by the latest valid update in the project or its loaded descendant
 Activity previews Issues, with a separate project filter. Todo remains independently
 ordered by recorded priority and includes only not-started Tasks. Opening a Work
 record uses the existing authorized detail reader. Loaded children are shown before
-a collapsible description. Capture expands inline at the bottom of the page and preserves its draft when
-closed. It is explicit page-memory text, not a Work write. A separate All shared
+a collapsible description. Notepad is the Capture surface. The toolbar action
+scrolls to and focuses its multiline editor; Save note clears the editor and makes
+the text readable in Saved notes. Filters and source navigation preserve the draft
+while this page remains open. Notes are explicitly in page memory, not persistent
+storage or a Work write. iPhone places the notepad after Todo. A separate All shared
 work list keeps other permitted Work kinds reachable.
 
 The loader preserves the current Wallet-approved read client and its permission,

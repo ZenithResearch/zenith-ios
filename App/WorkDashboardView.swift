@@ -10,6 +10,10 @@ struct WorkDashboardView: View {
   let loadMore: (() -> Void)?
   let destination: (WorkRecord) -> AnyView
   let arenaDestination: (ArenaRecord) -> AnyView
+  @Binding var captureText: String
+  @Binding var captures: [String]
+  @Binding var captureRequested: Bool
+  @FocusState private var noteFocused: Bool
   @Environment(\.dynamicTypeSize) private var typeSize
   @Environment(\.horizontalSizeClass) private var sizeClass
   private var previewCount: Int { sizeClass == .regular && !typeSize.isAccessibilitySize ? 2 : 1 }
@@ -42,14 +46,13 @@ struct WorkDashboardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             if geometry.size.width >= 760 && !typeSize.isAccessibilitySize {
-              HStack(alignment: .top, spacing: 16) {
-                pulse.frame(maxWidth: .infinity)
-                VStack(spacing: 16) { activity; todo }.frame(maxWidth: .infinity)
-              }
+              WorkDashboardPair { pulse; activity }
+              WorkDashboardPair { notepad; todo }
             } else {
               pulse
               activity
               todo
+              notepad
             }
             NavigationLink(value: Panel.all) { Text("Browse all shared work").font(.subheadline) }
               .frame(maxWidth: .infinity, minHeight: 44)
@@ -61,6 +64,12 @@ struct WorkDashboardView: View {
           }.padding(16).frame(maxWidth: 1280).frame(maxWidth: .infinity)
         }.background(Color(uiColor: .systemGroupedBackground))
           .scrollDismissesKeyboard(.interactively)
+          .onChange(of: captureRequested) { _, requested in
+            guard requested else { return }
+            withAnimation { scroll.scrollTo("work-notepad", anchor: .bottom) }
+            noteFocused = true
+            captureRequested = false
+          }
           .navigationDestination(for: Panel.self) { panel in
             WorkDashboardExpanded(panel: panel, snapshot: snapshot, scope: scope,
               project: activityProject, destination: destination)
@@ -119,6 +128,7 @@ struct WorkDashboardView: View {
         }.buttonStyle(.plain)
       }
       if projects.isEmpty { empty("No projects in this loaded context.") }
+      Spacer(minLength: 0)
       Text("Recent record changes · \(projects.count) loaded projects")
         .font(.caption2).foregroundStyle(.secondary)
     }.id(Panel.pulse)
@@ -138,9 +148,9 @@ struct WorkDashboardView: View {
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 8) {
-            filterChip("All projects", selected: activityProject == nil) { activityProject = nil }
+            filterChip("All projects", subtitle: "\(snapshot.issues().count) issues", selected: activityProject == nil) { activityProject = nil }
             ForEach(snapshot.projects().filter { !snapshot.issues(in: $0.rowID).isEmpty }, id: \.rowID) { project in
-              filterChip(project.title, selected: activityProject == project.rowID) {
+              filterChip(project.title, subtitle: "\(snapshot.issues(in: project.rowID).count) issues", selected: activityProject == project.rowID) {
                 activityProject = activityProject == project.rowID ? nil : project.rowID
               }
             }
@@ -154,6 +164,7 @@ struct WorkDashboardView: View {
           }.buttonStyle(.plain)
         }
         if issues.isEmpty { empty("No issues in this loaded context.") }
+        Spacer(minLength: 0)
         Text("Record activity · session activity unavailable")
           .font(.caption2).foregroundStyle(.secondary)
       }
@@ -172,6 +183,7 @@ struct WorkDashboardView: View {
         }.buttonStyle(.plain)
       }
       if snapshot.todos.isEmpty { empty("No not-started tasks loaded.") }
+      Spacer(minLength: 0)
       Text("\(snapshot.todos.count) not started · priority order")
         .font(.caption2).foregroundStyle(.secondary)
     }.id(Panel.todo)
@@ -187,23 +199,76 @@ struct WorkDashboardView: View {
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Color.accentColor : .clear))
     }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
   }
-  private func filterChip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      Text(title).font(.caption.weight(.medium)).lineLimit(1).padding(.horizontal, 12)
-        .frame(minHeight: 44).background(selected ? Color.accentColor.opacity(0.12) : Color(uiColor: .tertiarySystemGroupedBackground),
-                                       in: RoundedRectangle(cornerRadius: 8))
-    }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+  private func filterChip(_ title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    contextChip(title, subtitle: subtitle, selected: selected, action: action)
+  }
+  private var notepad: some View {
+    WorkDashboardCard {
+      HStack {
+        Text("Notepad").font(.headline).accessibilityAddTraits(.isHeader)
+        Spacer()
+        Button("Save note") {
+          let text = captureText.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !text.isEmpty else { return }
+          captures.insert(text, at: 0)
+          captureText = ""
+          noteFocused = false
+        }.font(.subheadline).frame(minHeight: 44)
+          .disabled(captureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+      TextField("Capture a thought…", text: $captureText, axis: .vertical)
+        .font(.body).lineLimit(4...8).focused($noteFocused)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .accessibilityLabel("Capture a note")
+        .accessibilityIdentifier("work.notepad.input")
+      if !captures.isEmpty {
+        DisclosureGroup("Saved notes (\(captures.count))") {
+          ForEach(Array(captures.enumerated()), id: \.offset) { _, text in
+            Text(text).font(.subheadline).textSelection(.enabled)
+              .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 4)
+          }
+        }.font(.subheadline)
+      }
+      Spacer(minLength: 0)
+      Text("Page memory only · no task created").font(.caption2).foregroundStyle(.secondary)
+    }.id("work-notepad")
   }
   private func empty(_ text: String) -> some View {
     Text(text).font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 12)
   }
 }
 
+/// Two columns share a row height. A 0.618 primary track yields to a readable sidebar.
+private struct WorkDashboardPair: Layout {
+  private let gap: CGFloat = 16
+  private func tracks(_ width: CGFloat) -> (CGFloat, CGFloat) {
+    let available = max(0, width - gap)
+    let secondary = min(available / 2, max(300, available * 0.382))
+    return (available - secondary, secondary)
+  }
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let width = proposal.width ?? 1000
+    let (primary, secondary) = tracks(width)
+    let height = zip(subviews, [primary, secondary]).map {
+      $0.0.sizeThatFits(ProposedViewSize(width: $0.1, height: nil)).height
+    }.max() ?? 0
+    return CGSize(width: width, height: height)
+  }
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    let (primary, secondary) = tracks(bounds.width)
+    for (index, view) in subviews.enumerated() {
+      view.place(at: CGPoint(x: bounds.minX + (index == 0 ? 0 : primary + gap), y: bounds.minY),
+                 anchor: .topLeading,
+                 proposal: ProposedViewSize(width: index == 0 ? primary : secondary, height: bounds.height))
+    }
+  }
+}
+
 private struct WorkDashboardCard<Content: View>: View {
   @ViewBuilder var content: () -> Content
   var body: some View {
-    VStack(alignment: .leading, spacing: 10, content: content).padding(14)
-      .frame(maxWidth: .infinity, alignment: .leading)
+    VStack(alignment: .leading, spacing: 12, content: content).padding(16)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
   }
 }
