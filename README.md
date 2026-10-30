@@ -48,6 +48,26 @@ Use the selected phone's identifier and approved team ID for these variables. A 
 
 The phone has its own wallet storage. Installing the app does not copy Simulator custody. Create a disposable wallet or explicitly restore its encrypted recovery file through the app. Membership and work access still require the separate configuration and approval below. Successful installation is not completion of the physical-device qualification checklist.
 
+When repackaging an existing sealed device build, sign every embedded Mach-O
+before signing the outer app. Debug builds can include top-level
+`Zenith.debug.dylib` and `__preview.dylib`; an outer
+`codesign --verify --deep --strict` check alone can pass while those libraries
+remain unsigned. Use the existing certificate fingerprint and an unused output:
+
+```sh
+python3 scripts/package-ios-app.py --source-app "$ZENITH_SOURCE_APP" \
+  --output-app "$ZENITH_OUTPUT_APP" --build-number "$ZENITH_BUILD_NUMBER" \
+  --identity "$ZENITH_SIGNING_CERT_SHA1"
+python3 scripts/package-ios-app.py --source-app "$ZENITH_OUTPUT_APP" --verify-only
+```
+
+The packager rejects a changed source seal or external symbolic links before
+signing. It preserves the source app's provisioning profile, app identity and
+entitlements, including Keychain groups, and verifies each embedded executable
+against the provisioning team. After installing in place, verify that the app
+stays running and displays its UI; a successful launch-command response alone
+does not establish this.
+
 ## Hermes chat
 
 Chat connects to a personal Hermes gateway over the existing embedded Tailscale connection. It uses Hermes's authenticated Sessions API, keeps the gateway key in the device-only Keychain, and reloads server-side conversation history. See [Hermes chat](HERMES-CHAT.md) for setup, interrupted-send behavior and qualification.

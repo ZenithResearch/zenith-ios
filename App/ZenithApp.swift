@@ -57,13 +57,22 @@ final class WalletModel: ObservableObject {
   }
   private var unlockTimer = WalletUnlockTimer()
   @Published var state: WalletState? {
-    didSet { unlockTimer.observe(unlocked: state?.unlocked == true, now: Date(), uptime: ProcessInfo.processInfo.systemUptime) }
+    didSet {
+      unlockTimer.observe(unlocked: state?.unlocked == true, now: Date(), uptime: ProcessInfo.processInfo.systemUptime)
+      if let owner = workSessionOwner, (state?.publicKey.map { $0 != owner } == true || state?.configured == false) {
+        hasWorkSession = false; workSessionOwner = nil
+        Task { await HolderSessionRegistry.shared.closeAll(); generation += 1 }
+      }
+    }
   }
   @Published private(set) var identityAccounts: [IdentityAccount] = []
   private var identityRegistry: IdentityAccountRegistry?
   // Selected recovery/data files remain encrypted even in this process.
   @Published var recoverySelection: Data?
   @Published var dataSelection: Data?
+  private var workSessionOwner: String?
+  @Published var hasWorkSession = false
+  func activateWorkSession(owner: String) { workSessionOwner = owner; hasWorkSession = true }
   @Published var busy = false
   @Published var error: String?
   @Published var notice: String?
@@ -131,6 +140,7 @@ final class WalletModel: ObservableObject {
       do {
         try store.save(configuration, replacing: previous)
         self.workServer = configuration
+        if configuration == nil { self.hasWorkSession = false; Task { await HolderSessionRegistry.shared.closeAll() } }
         self.workDraft.reset()
         self.generation += 1
         self.notice = configuration == nil ? "Server removed from this device." : "Server saved. Review read access to connect."

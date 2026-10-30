@@ -15,6 +15,7 @@
 		1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */; };
 		2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */; };
 		3B5B02EF4F979FBEC6FE6329 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816148DAF0ACAFA83EE9439E /* RootView.swift */; };
+		3C21E463A70F84E72CC4156C /* WorkSessionReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A748CBE1734164EE2BA9BD82 /* WorkSessionReview.swift */; };
 		45DC77791C28EB84FEE6C0E2 /* WorkConnectionSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A991E568D963A960C0F62136 /* WorkConnectionSection.swift */; };
 		49F7F67AE5F4BE68E71AA6A0 /* TailscaleDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FD1E69895BC3E3D168D6D5B /* TailscaleDriver.swift */; };
 		4DDB84468536881BD449B3BB /* TailscaleKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8890E03AAC5EA21EC0328EB3 /* TailscaleKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -85,6 +86,7 @@
 		996EF2B10FEF9FF4E01B33A7 /* ImportWalletFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportWalletFlow.swift; sourceTree = "<group>"; };
 		A11DA38A09370928D5BB5759 /* BiometricKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricKeychain.swift; sourceTree = "<group>"; };
 		A25D0F3A41C6DB693A5D6406 /* HermesChatKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesChatKeychain.swift; sourceTree = "<group>"; };
+		A748CBE1734164EE2BA9BD82 /* WorkSessionReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkSessionReview.swift; sourceTree = "<group>"; };
 		A991E568D963A960C0F62136 /* WorkConnectionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkConnectionSection.swift; sourceTree = "<group>"; };
 		B674C90C6E78C4F9BEB7D9D3 /* PortableViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortableViews.swift; sourceTree = "<group>"; };
 		BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZenithApp.swift; sourceTree = "<group>"; };
@@ -216,6 +218,7 @@
 				73CFFABEE77694980A850528 /* WorkDashboardView.swift */,
 				79D258783B77FFCE64E01F25 /* WorkServerDraft.swift */,
 				7AFA139C831007EAFD6BCE60 /* WorkServerSetupView.swift */,
+				A748CBE1734164EE2BA9BD82 /* WorkSessionReview.swift */,
 				BEC899D12681D36B17B5C0C1 /* ZenithApp.swift */,
 				0FE9E591D1B27B8EFCEB7696 /* Chat */,
 				7652DC118BA843986EE7F0DE /* Licenses */,
@@ -330,6 +333,7 @@
 				EFDF673FD1C420EBB37578FB /* WorkDashboardView.swift in Sources */,
 				2F3845136436F0A9E704E5F2 /* WorkServerDraft.swift in Sources */,
 				77426BE1161C6AD8936723D2 /* WorkServerSetupView.swift in Sources */,
+				3C21E463A70F84E72CC4156C /* WorkSessionReview.swift in Sources */,
 				1AAF57D9B8C6A35C46C46371 /* ZenithApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -401,7 +405,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",
@@ -428,7 +432,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 46;
+				CURRENT_PROJECT_VERSION = 47;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"Artifacts\"",

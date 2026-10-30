@@ -63,7 +63,7 @@ not demonstrate live server or session connectivity.
 
 Work remains SwiftUI for this delivery. The proposed embedded HTML/CSS,
 TypeScript and Rust/WASM view runtime is deferred as Project/blank-dashboard,
-under Initiative/zenith-app-experience in Arena/zenith-app (Zenith App).
+under Initiative/zenith-app-experience (iOS App) in Arena/zenith (Zenith).
 Its purpose is to let users compose or author their own views. Wallet screens,
 custody and approval remain native. No embedded runtime, plugin loader or new
 bridge is introduced by the Work dashboard.
