@@ -80,6 +80,32 @@ def verify(app, expected_entitlements=None):
             "mach_o_binaries": [str(p.relative_to(app)) for p in embedded]}
 
 
+def verify_baseline(app, baseline):
+    """Reject an update that changes an explicitly selected installed baseline.
+
+    This check runs before any output is created or signed. A renewed profile is
+    allowed, but it must still admit the exact existing Keychain access groups.
+    """
+    verify(baseline)
+    actual, previous = entitlements(app), entitlements(baseline)
+    if actual != previous:
+        raise RuntimeError("Update entitlements differ from the selected baseline")
+    current_info = plistlib.loads((app / "Info.plist").read_bytes())
+    previous_info = plistlib.loads((baseline / "Info.plist").read_bytes())
+    if current_info["CFBundleIdentifier"] != previous_info["CFBundleIdentifier"]:
+        raise RuntimeError("Update bundle identifier differs from the selected baseline")
+    profile = plistlib.loads(run("security", "cms", "-D", "-i",
+                                str(app / "embedded.mobileprovision")).stdout)
+    allowed = profile["Entitlements"].get("keychain-access-groups", [])
+    for group in previous.get("keychain-access-groups", []):
+        if not any(group == pattern or pattern.endswith("*") and
+                   group.startswith(pattern[:-1]) for pattern in allowed):
+            raise RuntimeError("Update profile does not admit a baseline Keychain group")
+    return {"baseline_entitlements_unchanged": True,
+            "baseline_keychain_groups_admitted": True,
+            "baseline_bundle_identifier_unchanged": True}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-app", type=Path, required=True)
@@ -87,10 +113,13 @@ def main():
     parser.add_argument("--output-app", type=Path)
     parser.add_argument("--build-number")
     parser.add_argument("--identity", help="Existing code-signing certificate SHA-1")
+    parser.add_argument("--baseline-app", type=Path,
+                        help="Previously installed signed app; reject entitlement/identity changes before packaging")
     args = parser.parse_args()
     app = args.source_app.resolve()
+    baseline_checks = verify_baseline(app, args.baseline_app.resolve()) if args.baseline_app else {}
     if args.verify_only:
-        print(json.dumps(verify(app)))
+        print(json.dumps(dict(verify(app), **baseline_checks)))
         return
     if not all((args.output_app, args.build_number, args.identity)):
         parser.error("Packaging requires --output-app, --build-number and --identity")
@@ -138,6 +167,7 @@ def main():
     result = verify(output, original_entitlements)
     result.update(build=args.build_number, same_application_identifier=True,
                   same_keychain_access_groups=True, same_provisioning_profile=True)
+    result.update(baseline_checks)
     print(json.dumps(result))
 
 
