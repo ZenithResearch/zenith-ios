@@ -11,6 +11,11 @@ readability takes precedence over an exact ratio. Large accessibility text
 returns to the single-column layout. System grouped surfaces,
 Dynamic Type, segmented pickers, NavigationStack, and searchable expanded lists
 follow the existing iOS app. There is no personal-focus mode or project icon.
+The wide layout omits redundant section-jump navigation. Compact context cards,
+subtle panel separators and selected-context counts keep the hierarchy readable.
+Status dots supplement explicit text, never replace it. Project rows show Arena
+context and separate Doing/Done task previews; issue counts stay secondary.
+The notepad editor has a quiet inset surface using native semantic colors.
 
 Arenas and Initiatives are context filters above the permanent project list.
 Projects rank by the latest valid update in the project or its loaded descendants.
@@ -53,3 +58,12 @@ estimates. Project complexity therefore remains Unestimated, without a guessed
 percentage, completion bar, or velocity. Recorded Task Done does not imply accepted
 delivery. The isolated QA app verifies presentation with synthetic data; it does
 not demonstrate live server or session connectivity.
+
+## Future user-created views
+
+Work remains SwiftUI for this delivery. The proposed embedded HTML/CSS,
+TypeScript and Rust/WASM view runtime is deferred as Project/blank-dashboard,
+under Initiative/zenith-app-experience in Arena/zenith-app (Zenith App).
+Its purpose is to let users compose or author their own views. Wallet screens,
+custody and approval remain native. No embedded runtime, plugin loader or new
+bridge is introduced by the Work dashboard.

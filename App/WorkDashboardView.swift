@@ -34,12 +34,14 @@ struct WorkDashboardView: View {
               if loading { ProgressView().accessibilityLabel("Loading work") }
               else { Text("\(snapshot.records.count) items").font(.caption).foregroundStyle(.secondary) }
             }
-            HStack(spacing: 0) {
-              ForEach([Panel.pulse, .activity, .todo], id: \.self) { panel in
-                Button(panel.rawValue) { withAnimation { scroll.scrollTo(panel, anchor: .top) } }
-                  .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity, minHeight: 44)
-              }
-            }.background(.background, in: RoundedRectangle(cornerRadius: 12))
+            if geometry.size.width < 760 || typeSize.isAccessibilitySize {
+              HStack(spacing: 0) {
+                ForEach([Panel.pulse, .activity, .todo], id: \.self) { panel in
+                  Button(panel.rawValue) { withAnimation { scroll.scrollTo(panel, anchor: .top) } }
+                    .font(.subheadline.weight(.medium)).frame(maxWidth: .infinity, minHeight: 44)
+                }
+              }.background(.background, in: RoundedRectangle(cornerRadius: 12))
+            }
 
             if let message {
               Text(message).font(.footnote).foregroundStyle(.secondary)
@@ -78,9 +80,13 @@ struct WorkDashboardView: View {
     }
   }
 
-  private func heading(_ panel: Panel, count: Int, showsAll: Bool = true) -> some View {
+  private func heading(_ panel: Panel, count: Int?, showsAll: Bool = true) -> some View {
     HStack {
       Text(panel.rawValue).font(.headline).accessibilityAddTraits(.isHeader)
+      if let count {
+        Text(count, format: .number).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+          .accessibilityLabel(workDashboardCount(count, "loaded item"))
+      }
       Spacer()
       if showsAll {
         NavigationLink(value: panel) { Text("See all").font(.subheadline) }
@@ -91,23 +97,23 @@ struct WorkDashboardView: View {
   }
   private var pulse: some View {
     WorkDashboardCard {
-      heading(.pulse, count: snapshot.projects().count)
+      heading(.pulse, count: snapshot.projects(in: scope).count)
       Picker("Context", selection: $context) {
         Text("Arenas").tag(0); Text("Initiatives").tag(1)
       }.pickerStyle(.segmented).onChange(of: context) { _, _ in scope = .all }
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          contextChip("All work", subtitle: "\(snapshot.projects().count) projects", selected: scope == .all) { scope = .all }
+          contextChip("All work", subtitle: workDashboardCount(snapshot.projects().count, "project"), selected: scope == .all) { scope = .all }
           if context == 0 {
             ForEach(snapshot.orderedArenas) { arena in
               let projects = snapshot.projects(in: .arena(arena.id))
-              contextChip(arena.title, subtitle: "\(projects.count) projects", selected: scope == .arena(arena.id)) {
+              contextChip(arena.title, subtitle: workDashboardCount(projects.count, "project"), selected: scope == .arena(arena.id)) {
                 scope = scope == .arena(arena.id) ? .all : .arena(arena.id)
               }.contextMenu { NavigationLink("Arena details") { arenaDestination(arena) } }
             }
           } else {
             ForEach(snapshot.initiatives, id: \.rowID) { initiative in
-              contextChip(initiative.title, subtitle: "\(snapshot.projects(in: .initiative(initiative.rowID)).count) projects",
+              contextChip(initiative.title, subtitle: workDashboardCount(snapshot.projects(in: .initiative(initiative.rowID)).count, "project"),
                           selected: scope == .initiative(initiative.rowID)) {
                 scope = scope == .initiative(initiative.rowID) ? .all : .initiative(initiative.rowID)
               }
@@ -135,7 +141,7 @@ struct WorkDashboardView: View {
   }
   private var activity: some View {
     WorkDashboardCard {
-      heading(.activity, count: snapshot.issues().count, showsAll: !sessions)
+      heading(.activity, count: sessions ? nil : snapshot.issues(in: activityProject).count, showsAll: !sessions)
       Picker("Activity view", selection: $sessions) {
         Text("Issues").tag(false); Text("Sessions").tag(true)
       }.pickerStyle(.segmented)
@@ -148,9 +154,9 @@ struct WorkDashboardView: View {
       } else {
         ScrollView(.horizontal, showsIndicators: false) {
           HStack(spacing: 8) {
-            filterChip("All projects", subtitle: "\(snapshot.issues().count) issues", selected: activityProject == nil) { activityProject = nil }
+            filterChip("All projects", subtitle: workDashboardCount(snapshot.issues().count, "issue"), selected: activityProject == nil) { activityProject = nil }
             ForEach(snapshot.projects().filter { !snapshot.issues(in: $0.rowID).isEmpty }, id: \.rowID) { project in
-              filterChip(project.title, subtitle: "\(snapshot.issues(in: project.rowID).count) issues", selected: activityProject == project.rowID) {
+              filterChip(project.title, subtitle: workDashboardCount(snapshot.issues(in: project.rowID).count, "issue"), selected: activityProject == project.rowID) {
                 activityProject = activityProject == project.rowID ? nil : project.rowID
               }
             }
@@ -192,12 +198,13 @@ struct WorkDashboardView: View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: 4) {
         Text(title).font(.subheadline.weight(.medium)).lineLimit(1)
-        Text(subtitle).font(.caption).foregroundStyle(.secondary)
-      }.frame(width: 156, alignment: .leading).padding(12)
+        Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+      }.frame(width: 140, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 10)
         .background(selected ? Color.accentColor.opacity(0.12) : Color(uiColor: .tertiarySystemGroupedBackground),
                     in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? Color.accentColor : .clear))
-    }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    }.buttonStyle(.plain).accessibilityLabel(title + ", " + subtitle)
+      .accessibilityAddTraits(selected ? .isSelected : [])
   }
   private func filterChip(_ title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
     contextChip(title, subtitle: subtitle, selected: selected, action: action)
@@ -219,6 +226,8 @@ struct WorkDashboardView: View {
       TextField("Capture a thought…", text: $captureText, axis: .vertical)
         .font(.body).lineLimit(4...8).focused($noteFocused)
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .padding(12)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityLabel("Capture a note")
         .accessibilityIdentifier("work.notepad.input")
       if !captures.isEmpty {
@@ -270,31 +279,48 @@ private struct WorkDashboardCard<Content: View>: View {
     VStack(alignment: .leading, spacing: 12, content: content).padding(16)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
       .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+      .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color(uiColor: .separator).opacity(0.18)))
   }
 }
 
 private struct WorkDashboardProjectRow: View {
   let row: WorkRecord
   let snapshot: WorkDashboard
+  @Environment(\.dynamicTypeSize) private var typeSize
   var body: some View {
     let tasks = snapshot.tasks(in: row)
     VStack(alignment: .leading, spacing: 7) {
-      HStack(alignment: .firstTextBaseline) {
+      let titleLayout = typeSize.isAccessibilitySize
+        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+        : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
+      titleLayout {
         Text(row.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
-        Spacer(minLength: 4)
+        if !typeSize.isAccessibilitySize { Spacer(minLength: 4) }
         if let date = snapshot.latestDate(for: row) {
           Text(date, format: .dateTime.month(.abbreviated).day()).font(.caption2).foregroundStyle(.secondary)
         }
       }
-      Text(row.progressLabel + " · Unestimated").font(.caption).foregroundStyle(.secondary)
+      let statusLayout = typeSize.isAccessibilitySize
+        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+        : AnyLayout(HStackLayout(spacing: 8))
+      statusLayout {
+        WorkDashboardStatus(row: row)
+        Text("Unestimated").foregroundStyle(.secondary)
+      }.font(.caption)
+      let context = snapshot.context(for: row)
+      if !context.isEmpty {
+        Text(context).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+      }
       let active = tasks.filter { $0.progress == "in_progress" }
       let done = tasks.filter { $0.progress == "done" }
-      if let task = active.first ?? done.first {
-        Text((active.isEmpty ? "Done: " : "In progress: ") + task.title)
-          .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+      if let task = active.first {
+        WorkDashboardTaskPreview(label: "Doing", task: task)
       }
-      Text("\(snapshot.issues(in: row.rowID).count) issues · \(active.count) in progress · \(done.count) Done" + (snapshot.complete ? "" : " · loaded"))
-        .font(.caption2).foregroundStyle(.secondary)
+      if let task = done.first {
+        WorkDashboardTaskPreview(label: "Done", task: task)
+      }
+      Text(workDashboardCount(snapshot.issues(in: row.rowID).count, "issue") + (snapshot.complete ? "" : " loaded"))
+        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
     }.frame(maxWidth: .infinity, minHeight: 70, alignment: .leading).padding(.vertical, 4)
       .accessibilityElement(children: .combine)
   }
@@ -308,15 +334,57 @@ private struct WorkDashboardIssueRow: View {
       Text(row.title).font(.subheadline.weight(.medium)).foregroundStyle(.primary).lineLimit(2)
       Text(snapshot.context(for: row)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
       HStack {
-        Text(row.progressLabel)
+        WorkDashboardStatus(row: row)
         Spacer()
         if let date = snapshot.latestDate(for: row) { Text(date, format: .dateTime.month(.abbreviated).day()) }
-      }.font(.caption2).foregroundStyle(.secondary)
+      }.font(.caption).foregroundStyle(.secondary)
       if let task = snapshot.tasks(in: row).first {
-        Text(task.progressLabel + " · " + task.title).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        WorkDashboardTaskPreview(label: task.progressLabel, task: task)
       }
     }.frame(maxWidth: .infinity, minHeight: 66, alignment: .leading).padding(.vertical, 4)
       .accessibilityElement(children: .combine)
+  }
+}
+
+private func workDashboardCount(_ count: Int, _ noun: String) -> String {
+  "\(count) \(noun)\(count == 1 ? "" : "s")"
+}
+
+/// Status always has a text label; the dot is a supplementary scanning cue.
+private struct WorkDashboardStatus: View {
+  let row: WorkRecord
+  private var color: Color {
+    switch row.progress {
+    case "in_progress": return .accentColor
+    case "done": return .secondary
+    default: return Color(uiColor: .tertiaryLabel)
+    }
+  }
+  var body: some View {
+    HStack(spacing: 5) {
+      Circle().fill(color).frame(width: 5, height: 5).accessibilityHidden(true)
+      Text(row.progressLabel).foregroundStyle(.secondary)
+    }.fixedSize(horizontal: false, vertical: true)
+  }
+}
+
+private struct WorkDashboardTaskPreview: View {
+  let label: String
+  let task: WorkRecord
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Text(label).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+          .padding(.horizontal, 6).padding(.vertical, 3)
+          .background(Color(uiColor: .tertiarySystemGroupedBackground), in: Capsule())
+          .fixedSize()
+        Text(task.title).font(.caption).lineLimit(1)
+      }
+      VStack(alignment: .leading, spacing: 3) {
+        Text(label).font(.caption2).foregroundStyle(.secondary)
+        Text(task.title).font(.caption).lineLimit(2)
+      }
+    }.foregroundStyle(.primary).accessibilityElement(children: .combine)
   }
 }
 
