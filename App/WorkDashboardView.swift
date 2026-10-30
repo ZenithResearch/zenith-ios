@@ -20,7 +20,6 @@ struct WorkDashboardView: View {
   @State private var context = 0
   @State private var scope = WorkDashboard.Scope.all
   @State private var activityProject: String?
-  @State private var sessions = false
 
   var body: some View {
     GeometryReader { geometry in
@@ -59,7 +58,7 @@ struct WorkDashboardView: View {
             NavigationLink(value: Panel.all) { Text("Browse all shared work").font(.subheadline) }
               .frame(maxWidth: .infinity, minHeight: 44)
             if let loadMore {
-              Button("Load more shared work", action: loadMore)
+              Button("Continue loading shared work", action: loadMore)
                 .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
                 .disabled(loading)
             }
@@ -122,7 +121,7 @@ struct WorkDashboardView: View {
         }.padding(.vertical, 4)
       }
       if context == 0 && snapshot.arenas.isEmpty {
-        Text("Arena context is not shared by this connection.").font(.caption).foregroundStyle(.secondary)
+        Text(loading ? "Loading Arena context…" : "Arena context is not shared by this connection.").font(.caption).foregroundStyle(.secondary)
       } else if context == 0 && !snapshot.arenaMembershipComplete {
         Text("Arena membership is partially loaded.").font(.caption).foregroundStyle(.secondary)
       }
@@ -133,7 +132,7 @@ struct WorkDashboardView: View {
           WorkDashboardProjectRow(row: row, snapshot: snapshot)
         }.buttonStyle(.plain)
       }
-      if projects.isEmpty { empty("No projects in this loaded context.") }
+      if projects.isEmpty { empty(loading ? "Loading projects and context…" : "No projects shared in this context.") }
       Spacer(minLength: 0)
       Text("Recent record changes · \(projects.count) loaded projects")
         .font(.caption2).foregroundStyle(.secondary)
@@ -141,39 +140,29 @@ struct WorkDashboardView: View {
   }
   private var activity: some View {
     WorkDashboardCard {
-      heading(.activity, count: sessions ? nil : snapshot.issues(in: activityProject).count, showsAll: !sessions)
-      Picker("Activity view", selection: $sessions) {
-        Text("Issues").tag(false); Text("Sessions").tag(true)
-      }.pickerStyle(.segmented)
-      if sessions {
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Sessions need native read access").font(.subheadline.weight(.medium))
-          Text("This connection shares Work, but has no session-ref read route. Your source sessions are unchanged.")
-            .font(.caption).foregroundStyle(.secondary)
-        }.padding(.vertical, 8)
-      } else {
-        ScrollView(.horizontal, showsIndicators: false) {
-          HStack(spacing: 8) {
-            filterChip("All projects", subtitle: workDashboardCount(snapshot.issues().count, "issue"), selected: activityProject == nil) { activityProject = nil }
-            ForEach(snapshot.projects().filter { !snapshot.issues(in: $0.rowID).isEmpty }, id: \.rowID) { project in
-              filterChip(project.title, subtitle: workDashboardCount(snapshot.issues(in: project.rowID).count, "issue"), selected: activityProject == project.rowID) {
-                activityProject = activityProject == project.rowID ? nil : project.rowID
-              }
+      heading(.activity, count: snapshot.issues(in: activityProject).count)
+      Text("Recent issues").font(.subheadline).foregroundStyle(.secondary).frame(minHeight: 32)
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 8) {
+          filterChip("All projects", subtitle: workDashboardCount(snapshot.issues().count, "issue"), selected: activityProject == nil) { activityProject = nil }
+          ForEach(snapshot.projects().filter { !snapshot.issues(in: $0.rowID).isEmpty }, id: \.rowID) { project in
+            filterChip(project.title, subtitle: workDashboardCount(snapshot.issues(in: project.rowID).count, "issue"), selected: activityProject == project.rowID) {
+              activityProject = activityProject == project.rowID ? nil : project.rowID
             }
-          }.padding(.vertical, 4)
-        }
-        let issues = snapshot.issues(in: activityProject)
-        ForEach(Array(issues.prefix(previewCount)), id: \.rowID) { row in
-          Divider()
-          NavigationLink { destination(row) } label: {
-            WorkDashboardIssueRow(row: row, snapshot: snapshot)
-          }.buttonStyle(.plain)
-        }
-        if issues.isEmpty { empty("No issues in this loaded context.") }
-        Spacer(minLength: 0)
-        Text("Record activity · session activity unavailable")
-          .font(.caption2).foregroundStyle(.secondary)
+          }
+        }.padding(.vertical, 4)
       }
+      let issues = snapshot.issues(in: activityProject)
+      ForEach(Array(issues.prefix(previewCount)), id: \.rowID) { row in
+        Divider()
+        NavigationLink { destination(row) } label: {
+          WorkDashboardIssueRow(row: row, snapshot: snapshot)
+        }.buttonStyle(.plain)
+      }
+      if issues.isEmpty { empty(loading ? "Loading shared issues…" : "No issues shared in this context.") }
+      Spacer(minLength: 0)
+      Text("Recent shared issue changes")
+        .font(.caption2).foregroundStyle(.secondary)
     }.id(Panel.activity)
   }
   private var todo: some View {

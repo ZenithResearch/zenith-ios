@@ -26,7 +26,7 @@ private struct ReviewDetail: View {
   var body: some View {
     List {
       Section { Text(row.title).font(.headline); Text(row.progressLabel); Text("Synthetic review item · no session or work mutation") }
-      let children = ReviewData.snapshot.records.filter { $0.parent == row.rowID }
+      let children = ReviewData.snapshot.records.filter { ReviewData.snapshot.parent(of: $0) == row.rowID }
       if !children.isEmpty {
         Section("Related work") { ForEach(children, id: \.rowID) { child in NavigationLink(child.title) { ReviewDetail(row: child) } } }
       }
@@ -35,8 +35,10 @@ private struct ReviewDetail: View {
 }
 private enum ReviewData {
   static let snapshot: WorkDashboard = {
+    var parents: [String: String] = [:]
     func row(_ kind: String, _ id: String, _ title: String, _ progress: String?, _ parent: String?, _ date: String, priority: Int = 0) -> WorkRecord {
-      let value: [String: Any] = ["kind":kind,"id":id,"title":title,"description":"Synthetic design review", "priority":priority,"version":1,"progress":progress as Any? ?? NSNull(),"parent":parent as Any? ?? NSNull(),"updated_at":date]
+      if let parent { parents[kind + "/" + id] = parent }
+      let value: [String: Any] = ["kind":kind,"id":id,"title":title,"description":"Synthetic design review", "priority":priority,"version":1,"progress":progress as Any? ?? NSNull(),"updated_at":date]
       return try! JSONDecoder().decode(WorkRecord.self, from: JSONSerialization.data(withJSONObject: value))
     }
     let arena = try! JSONDecoder().decode(ArenaRecord.self, from: Data("{\"kind\":\"Arena\",\"id\":\"product\",\"title\":\"Product\",\"description\":\"Synthetic\",\"version\":1,\"archived\":false}".utf8))
@@ -50,6 +52,6 @@ private enum ReviewData {
       row("Task","components","Use native input and navigation","done","Issue/mobile-overview","2026-10-28T17:00:00Z"),
       row("Task","review","Review the compact iPad layout","not_started","Issue/mobile-overview","2026-10-28T16:00:00Z",priority:80),
       row("Task","coverage","Check session source coverage","not_started","Issue/preserve-links","2026-10-28T15:00:00Z",priority:60)
-    ], arenas:[arena], members:["product":["Initiative/operator"]], complete:true, arenaMembershipComplete:true)
+    ], arenas:[arena], members:["product":["Initiative/operator"]], complete:true, arenaMembershipComplete:true, parents:parents)
   }()
 }

@@ -1,22 +1,25 @@
 import Foundation
 
 /// A read-only projection of the user's permitted, loaded Work. No parallel tracker.
-public struct WorkDashboard {
+public struct WorkDashboard: Sendable {
   public enum Scope: Hashable, Sendable { case all, arena(String), initiative(String) }
   public let records: [WorkRecord]
   public let arenas: [ArenaRecord]
   public let members: [String: Set<String>]
   public let complete: Bool
   public let arenaMembershipComplete: Bool
+  /// Parent/child reads witness these edges independently of list summaries.
+  public let parents: [String: String]
   private let index: [String: WorkRecord]
   private let dates: [String: Date]
   private let latestDates: [String: Date]
 
   public init(records: [WorkRecord], arenas: [ArenaRecord] = [],
               members: [String: Set<String>] = [:], complete: Bool = false,
-              arenaMembershipComplete: Bool = false) {
+              arenaMembershipComplete: Bool = false, parents: [String: String] = [:]) {
     self.records = records; self.arenas = arenas; self.members = members
     self.complete = complete; self.arenaMembershipComplete = arenaMembershipComplete
+    self.parents = parents
     let lookup = Dictionary(records.map { ($0.rowID, $0) }, uniquingKeysWith: { first, _ in first })
     index = lookup
     let formatter = ISO8601DateFormatter()
@@ -29,18 +32,19 @@ public struct WorkDashboard {
       var current: WorkRecord? = row, seen = Set<String>()
       while let next = current, seen.insert(next.rowID).inserted {
         latest[next.rowID] = max(latest[next.rowID] ?? .distantPast, date)
-        current = next.parent.flatMap { lookup[$0] }
+        current = (parents[next.rowID] ?? next.parent).flatMap { lookup[$0] }
       }
     }
     dates = own; latestDates = latest
   }
 
   public func record(_ key: String) -> WorkRecord? { index[key] }
+  public func parent(of row: WorkRecord) -> String? { parents[row.rowID] ?? row.parent }
   public func contains(_ row: WorkRecord, within key: String) -> Bool {
     var current: WorkRecord? = row, seen = Set<String>()
     while let next = current, seen.insert(next.rowID).inserted {
       if next.rowID == key { return true }
-      current = next.parent.flatMap { index[$0] }
+      current = parent(of: next).flatMap { index[$0] }
     }
     return false
   }
@@ -48,7 +52,7 @@ public struct WorkDashboard {
     var current: WorkRecord? = row, seen = Set<String>()
     while let next = current, seen.insert(next.rowID).inserted {
       if next.kind == kind { return next }
-      current = next.parent.flatMap { index[$0] }
+      current = parent(of: next).flatMap { index[$0] }
     }
     return nil
   }

@@ -373,36 +373,29 @@ struct WorkAccessView: View {
 struct NativeWorkView: View {
   @EnvironmentObject private var model: WalletModel
   @EnvironmentObject private var privateNetwork: PrivateNetworkModel
+  @EnvironmentObject private var draft: WorkServerDraft
   @State private var client: DevgraphReadClient?
   @State private var loadEpoch = UUID()
-  @State private var rows: [WorkRecord] = []
-  @State private var hasArenas = false
-  @State private var cursors: [String: WorkPageCursor] = [:]
-  @State private var finished: Set<String> = []
-  @State private var allowed: [String] = []
-  @State private var detailKinds: Set<String> = []
+  @State private var result = WorkDashboardReadResult()
+  @State private var requestLimit = 1000
   @State private var error: String?
   @State private var loading = false
   @State private var connection = false
-  @EnvironmentObject private var draft: WorkServerDraft
-  @State private var arenaRows: [ArenaRecord] = []
-  @State private var arenaMembers: [String: Set<String>] = [:]
-  @State private var arenaContextComplete = false
   @State private var capture = false
   @State private var captureText = ""
   @State private var captures: [String] = []
-  private var dashboard: WorkDashboard {
-    WorkDashboard(records: rows, arenas: arenaRows, members: arenaMembers,
-      complete: Set(["Initiative", "Project", "Issue", "Task"]).isSubset(of: Set(allowed))
-        && Set(allowed).isSubset(of: finished), arenaMembershipComplete: arenaContextComplete)
-  }
+  private var dashboard: WorkDashboard { result.dashboard }
   var body: some View {
     NavigationStack {
       WorkDashboardView(snapshot: dashboard, loading: loading,
-        message: error ?? (rows.isEmpty && !loading ? "Connect Work to see your shared projects, activity and tasks." : nil),
-        loadMore: !allowed.isEmpty && !Set(allowed).isSubset(of: finished) ? { Task { await loadMore() } } : nil,
+        message: error ?? (result.notes.isEmpty ? (result.records.isEmpty && !loading
+          ? "Connect Work to see your shared projects, activity and tasks." : nil) : result.notes.joined(separator: " ")),
+        loadMore: result.canContinue ? {
+          requestLimit = min(requestLimit + 1000, 10000)
+          Task { await reload() }
+        } : nil,
         destination: { row in AnyView(NativeWorkDetailView(row: row,
-          canRead: detailKinds.contains(row.kind), loadedContext: dashboard, detailKinds: detailKinds)) },
+          canRead: result.detailKinds.contains(row.kind), loadedContext: dashboard, detailKinds: result.detailKinds)) },
         arenaDestination: { arena in AnyView(NativeArenaDetailView(id: arena.id)) },
         captureText: $captureText, captures: $captures, captureRequested: $capture)
         .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
@@ -423,8 +416,7 @@ struct NativeWorkView: View {
     }
     .onChange(of: privateNetwork.generation) { _, _ in
       if model.workServer?.network == .tailscale {
-        client?.cancel(); rows = []; arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
-        cursors = [:]; finished = []; loading = false
+        loadEpoch = UUID(); client?.cancel(); result = WorkDashboardReadResult(); loading = false
         error = "Private connection changed. Open Connection to reconnect."
       }
     }
@@ -432,112 +424,34 @@ struct NativeWorkView: View {
   }
   private func reload() async {
     let epoch = UUID(); loadEpoch = epoch
-    client?.cancel()
-    rows = []
-    cursors = [:]
-    finished = []
-    allowed = []
-    detailKinds = []
-    hasArenas = false
-    arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
-    error = nil
+    client?.cancel(); result = WorkDashboardReadResult(); error = nil; loading = true
     let attempt = workConnectionLoadKey(model)
     let loaded = await workClient(model)
     guard !Task.isCancelled, epoch == loadEpoch, attempt == workConnectionLoadKey(model) else { loaded?.cancel(); return }
     client = loaded
-    loading = false
-    let version = model.generation
-    do {
-      if let manifest = try await client?.manifest() {
-        guard !Task.isCancelled, epoch == loadEpoch, version == model.generation else { return }
-        configurePermissions(manifest)
-        if rows.isEmpty { await loadMore() }
-        await loadArenaContext(manifest)
-      }
-    } catch {
-      guard !Task.isCancelled, epoch == loadEpoch, version == model.generation else { return }
-      self.error = "Work access needs setup or has expired. Open Work access in Wallet."
+    guard let loaded else {
+      loading = false
+      error = "Work access needs setup or has expired. Open Connection to check access."
+      return
     }
-
-  }
-  private func loadArenaContext(_ manifest: NativeReadManifest) async {
-    guard hasArenas, let client else { return }
-    let generation = model.generation, network = privateNetwork.generation, epoch = loadEpoch
-    func current() -> Bool { !Task.isCancelled && epoch == loadEpoch && generation == model.generation &&
-      (client.connection.network != .tailscale || network == privateNetwork.generation) }
-    do {
-      var after: String?
-      for _ in 0..<5 {
-        let page = try await client.arenas(after: after)
-        guard current() else { return }
-        guard Set(arenaRows.map(\.id)).isDisjoint(with: page.items.map(\.id)) else { throw WalletFailure.core("invalid_response") }
-        arenaRows += page.items; after = page.next
-        if after == nil { break }
-      }
-      var complete = after == nil
-      for arena in arenaRows {
-        let permitted = manifest.read_grants.contains { $0.isArena && $0.operations.contains("get") && ($0.all_arenas == true || ($0.arena_ids ?? []).contains(arena.id)) }
-        guard permitted else { complete = false; continue }
-        var cursor: WorkPageCursor?
-        for _ in 0..<10 {
-          let page = try await client.arenaMembers(id: arena.id, after: cursor)
-          guard current() else { return }
-          arenaMembers[arena.id, default: []].formUnion(page.items.map(\.rowID))
-          let existing = Set(rows.map(\.rowID))
-          rows += page.items.filter { !existing.contains($0.rowID) }
-          cursor = page.next
-          if cursor == nil { break }
-        }
-        if cursor != nil { complete = false }
-      }
-      guard current() else { return }
-      arenaContextComplete = complete
-    } catch {
-      guard current() else { return }
-      if invalidatesWorkAccess(error) { rows = []; arenaRows = []; arenaMembers = [:]; allowed = [] }
-      self.error = "Arena context could not finish loading. Open Connection to check access."
-    }
-  }
-  private func configurePermissions(_ manifest: NativeReadManifest) {
-    let grants: [WorkReadGrant] = manifest.read_grants
-    hasArenas = grants.contains { grant in grant.isArena && grant.operations.contains("list") }
-    let detail: [String] = grants.filter { $0.operations.contains("get") }.flatMap { $0.work_kinds }
-    let listed: [String] = grants.filter { $0.operations.contains("list") }.flatMap { $0.work_kinds }
-    detailKinds = Set(detail)
-    allowed = Array(Set(listed)).sorted()
-  }
-  private func loadMore() async {
-    guard !loading, let client else { return }
-    loading = true
-    error = nil
-    let version = model.generation, epoch = loadEpoch
-    let usesPrivateNetwork = client.connection.network == .tailscale
-    let networkVersion = privateNetwork.generation
+    let generation = model.generation, network = privateNetwork.generation
     func current() -> Bool {
-      epoch == loadEpoch && version == model.generation
-        && (!usesPrivateNetwork || networkVersion == privateNetwork.generation)
+      !Task.isCancelled && epoch == loadEpoch && generation == model.generation
+        && (loaded.connection.network != .tailscale || network == privateNetwork.generation)
     }
     defer { if current() { loading = false } }
     do {
-      for type in allowed where !finished.contains(type) {
-        let page = try await client.page(kind: type, after: cursors[type])
-        guard current(), !Task.isCancelled else { return }
-        if let next = page.next { cursors[type] = next } else { finished.insert(type) }
-        for item in page.items {
-          if let index = rows.firstIndex(where: { $0.rowID == item.rowID }) { rows[index] = item }
-          else { rows.append(item) }
-        }
+      let value = try await WorkDashboardReader().load(from: loaded, requestLimit: requestLimit) { partial in
+        guard !Task.isCancelled, epoch == loadEpoch, generation == model.generation,
+          loaded.connection.network != .tailscale || network == privateNetwork.generation else { return }
+        result = partial
       }
+      guard current() else { return }
+      result = value
     } catch {
-      if current() {
-        if invalidatesWorkAccess(error) {
-          rows = []; arenaRows = []; arenaMembers = [:]; arenaContextComplete = false
-          cursors = [:]
-          finished = []
-          allowed = []
-        }
-        self.error = error.localizedDescription
-      }
+      guard current() else { return }
+      if invalidatesWorkAccess(error) { result = WorkDashboardReadResult() }
+      self.error = error.localizedDescription
     }
   }
 }
@@ -563,7 +477,7 @@ struct NativeWorkDetailView: View {
           Text(record.title).font(.title2.bold())
           Text(record.progressLabel).font(.subheadline)
           if let context = loadedContext {
-            let children = context.records.filter { $0.parent == record.rowID }
+            let children = context.records.filter { context.parent(of: $0) == record.rowID }
             if !children.isEmpty {
               Text("Loaded related work").font(.headline)
               ForEach(context.recent(children), id: \.rowID) { child in

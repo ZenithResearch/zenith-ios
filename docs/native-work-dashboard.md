@@ -32,7 +32,7 @@ work list keeps other permitted Work kinds reachable.
 The loader preserves the current Wallet-approved read client and its permission,
 expiry, lifecycle and private-network checks. All graph state is read through the
 existing SDK. Arena membership is loaded only under explicit Arena get permission.
-Pagination remains bounded; counts and order describe loaded items. Unshared or
+WorkDashboardReader automatically follows pages for every Work kind included in the approved list grants (including Proposal and Todo where shared). It reads Arena members and explicit children/parent relationships separately: per-operation list grants may intentionally omit parent edges. WorkDashboard retains those witnessed edges independently of list-summary fields. Explicit Arena get grants also work without collection-list authority. Pagination and hierarchy reads have a request budget; reaching it retains partial data and offers Continue loading. Counts and order describe loaded items. Unshared or
 unfinished membership is not inferred from project titles or working directories.
 
 ## Additive consumer compatibility
@@ -46,11 +46,7 @@ permission schema, credential, persisted request, or service deployment change.
 ## Capability limits
 
 The native v2–v6 read protocols list Work and Arena resources, but do not expose
-session-ref reads or session-state writes. The Sessions segment states that this
-connection lacks that route. It does not call the prototype's private loopback
-companion or present record timestamps as session activity. Activity defaults to
-Issues and labels its ordering as record activity. Native session capabilities
-need a separately coordinated producer/permission/client change; existing grants
+session-ref reads or session-state writes. The Sessions option is deferred and hidden; Activity shows Issues. It does not call the prototype's private loopback companion or present record timestamps as session activity. Native session capabilities are tracked as Project/devgraph-native-session-pulse under Initiative/devgraph-runtime-integrations. The future deployment must package the DevGraph API and required observation/source-resolution dependencies through the lightweight Hub; Hub remains the deployer rather than the canonical Work service. That work needs a separately coordinated producer/permission/client change; existing grants
 are never expanded by this UI.
 
 The native read projection also supplies no compatible versioned complexity
