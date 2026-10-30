@@ -21,3 +21,5 @@ __pycache__/
 QA/NetworkUX/*.xcodeproj/
 
 QA/WalletImportReview/*.xcodeproj/
+
+QA/WorkDashboard/*.xcodeproj/
