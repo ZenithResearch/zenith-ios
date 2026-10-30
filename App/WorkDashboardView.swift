@@ -3,13 +3,17 @@ import ZenithKit
 
 /// Native presentation shared by the authenticated Work page and isolated UI review.
 struct WorkDashboardView: View {
-  enum Panel: String, Hashable { case pulse = "Project Pulse", activity = "Activity", todo = "Todo", all = "All shared work" }
+  enum Panel: String, Hashable { case pulse = "Project Pulse", activity = "Activity", todo = "Todo", all = "Loaded work" }
   let snapshot: WorkDashboard
   let loading: Bool
   let message: String?
   let loadMore: (() -> Void)?
   let destination: (WorkRecord) -> AnyView
   let arenaDestination: (ArenaRecord) -> AnyView
+  var loadSection: ((String) -> Void)? = nil
+  var listKinds: Set<String> = []
+  var moreKinds: Set<String> = []
+  var loadingKind: String? = nil
   @Binding var captureText: String
   @Binding var captures: [String]
   @Binding var captureRequested: Bool
@@ -19,6 +23,7 @@ struct WorkDashboardView: View {
   private var previewCount: Int { sizeClass == .regular && !typeSize.isAccessibilitySize ? 2 : 1 }
   @State private var context = 0
   @State private var scope = WorkDashboard.Scope.all
+  @State private var selectedArena: String?
   @State private var activityProject: String?
 
   var body: some View {
@@ -27,7 +32,7 @@ struct WorkDashboardView: View {
         ScrollView {
           VStack(alignment: .leading, spacing: 16) {
             HStack {
-              Text(snapshot.complete ? "Shared work" : "Loaded work")
+              Text(snapshot.complete ? "Work overview" : "Loading overview")
                 .font(.subheadline).foregroundStyle(.secondary)
               Spacer()
               if loading { ProgressView().accessibilityLabel("Loading work") }
@@ -55,7 +60,7 @@ struct WorkDashboardView: View {
               todo
               notepad
             }
-            NavigationLink(value: Panel.all) { Text("Browse all shared work").font(.subheadline) }
+            NavigationLink(value: Panel.all) { Text("Browse loaded work").font(.subheadline) }
               .frame(maxWidth: .infinity, minHeight: 44)
             if let loadMore {
               Button("Continue loading shared work", action: loadMore)
@@ -73,7 +78,8 @@ struct WorkDashboardView: View {
           }
           .navigationDestination(for: Panel.self) { panel in
             WorkDashboardExpanded(panel: panel, snapshot: snapshot, scope: scope,
-              project: activityProject, destination: destination)
+              project: activityProject, destination: destination, loading: loading,
+              loadSection: loadSection, listKinds: listKinds, moreKinds: moreKinds, message: message)
           }
       }
     }
@@ -99,15 +105,16 @@ struct WorkDashboardView: View {
       heading(.pulse, count: snapshot.projects(in: scope).count)
       Picker("Context", selection: $context) {
         Text("Arenas").tag(0); Text("Initiatives").tag(1)
-      }.pickerStyle(.segmented).onChange(of: context) { _, _ in scope = .all }
+      }.pickerStyle(.segmented).onChange(of: context) { _, _ in scope = .all; selectedArena = nil }
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          contextChip("All work", subtitle: workDashboardCount(snapshot.projects().count, "project"), selected: scope == .all) { scope = .all }
+          contextChip("All work", subtitle: workDashboardCount(snapshot.projects().count, "project"), selected: scope == .all) { scope = .all; selectedArena = nil }
           if context == 0 {
             ForEach(snapshot.orderedArenas) { arena in
               let projects = snapshot.projects(in: .arena(arena.id))
-              contextChip(arena.title, subtitle: workDashboardCount(projects.count, "project"), selected: scope == .arena(arena.id)) {
-                scope = scope == .arena(arena.id) ? .all : .arena(arena.id)
+              contextChip(arena.title, subtitle: workDashboardCount(projects.count, "project"), selected: selectedArena == arena.id) {
+                selectedArena = selectedArena == arena.id ? nil : arena.id
+                scope = selectedArena.map { .arena($0) } ?? .all
               }.contextMenu { NavigationLink("Arena details") { arenaDestination(arena) } }
             }
           } else {
@@ -119,6 +126,23 @@ struct WorkDashboardView: View {
             }
           }
         }.padding(.vertical, 4)
+      }
+      if let arena = selectedArena, context == 0 {
+        Text("Initiatives").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 8) {
+            contextChip("All in Arena", subtitle: "Projects", selected: scope == .arena(arena)) { scope = .arena(arena) }
+            ForEach(snapshot.initiatives(in: arena), id: \.rowID) { initiative in
+              contextChip(initiative.title,
+                subtitle: workDashboardCount(snapshot.projects(in: .initiative(initiative.rowID)).count, "project"),
+                selected: scope == .initiative(initiative.rowID)) { scope = .initiative(initiative.rowID) }
+            }
+          }.padding(.vertical, 4)
+        }
+        if snapshot.initiatives(in: arena).isEmpty {
+          Text(loading ? "Loading Initiative membership…" : "No Initiatives shared in this Arena.")
+            .font(.caption).foregroundStyle(.secondary)
+        }
       }
       if context == 0 && snapshot.arenas.isEmpty {
         Text(loading ? "Loading Arena context…" : "Arena context is not shared by this connection.").font(.caption).foregroundStyle(.secondary)
@@ -140,11 +164,11 @@ struct WorkDashboardView: View {
   }
   private var activity: some View {
     WorkDashboardCard {
-      heading(.activity, count: snapshot.issues(in: activityProject).count)
+      heading(.activity, count: snapshot.loadedKinds.contains("Issue") ? snapshot.issues(in: activityProject).count : nil)
       Text("Recent issues").font(.subheadline).foregroundStyle(.secondary).frame(minHeight: 32)
       ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 8) {
-          filterChip("All projects", subtitle: workDashboardCount(snapshot.issues().count, "issue"), selected: activityProject == nil) { activityProject = nil }
+          filterChip("All projects", subtitle: snapshot.loadedKinds.contains("Issue") ? workDashboardCount(snapshot.issues().count, "loaded issue") : "On request", selected: activityProject == nil) { activityProject = nil }
           ForEach(snapshot.projects().filter { !snapshot.issues(in: $0.rowID).isEmpty }, id: \.rowID) { project in
             filterChip(project.title, subtitle: workDashboardCount(snapshot.issues(in: project.rowID).count, "issue"), selected: activityProject == project.rowID) {
               activityProject = activityProject == project.rowID ? nil : project.rowID
@@ -159,15 +183,19 @@ struct WorkDashboardView: View {
           WorkDashboardIssueRow(row: row, snapshot: snapshot)
         }.buttonStyle(.plain)
       }
-      if issues.isEmpty { empty(loading ? "Loading shared issues…" : "No issues shared in this context.") }
+      if !snapshot.loadedKinds.contains("Issue") { sectionLoader("Issue", title: "Load issues") }
+      else {
+        if issues.isEmpty { empty("No issues in the loaded page for this context.") }
+        if moreKinds.contains("Issue") { sectionLoader("Issue", title: "Load more issues") }
+      }
       Spacer(minLength: 0)
-      Text("Recent shared issue changes")
+      Text("Issues load on request · 20 per page")
         .font(.caption2).foregroundStyle(.secondary)
     }.id(Panel.activity)
   }
   private var todo: some View {
     WorkDashboardCard {
-      heading(.todo, count: snapshot.todos.count)
+      heading(.todo, count: snapshot.loadedKinds.contains("Task") ? snapshot.todos.count : nil)
       ForEach(Array(snapshot.todos.prefix(previewCount)), id: \.rowID) { row in
         Divider()
         NavigationLink { destination(row) } label: {
@@ -177,11 +205,24 @@ struct WorkDashboardView: View {
           }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         }.buttonStyle(.plain)
       }
-      if snapshot.todos.isEmpty { empty("No not-started tasks loaded.") }
+      if !snapshot.loadedKinds.contains("Task") { sectionLoader("Task", title: "Load tasks") }
+      else {
+        if snapshot.todos.isEmpty { empty("No not-started tasks in the loaded page.") }
+        if moreKinds.contains("Task") { sectionLoader("Task", title: "Load more tasks") }
+      }
       Spacer(minLength: 0)
-      Text("\(snapshot.todos.count) not started · priority order")
+      Text("Loaded tasks · priority order")
         .font(.caption2).foregroundStyle(.secondary)
     }.id(Panel.todo)
+  }
+  @ViewBuilder private func sectionLoader(_ kind: String, title: String) -> some View {
+    if let loadSection, listKinds.contains(kind) {
+      Button(loadingKind == kind ? "Loading…" : title) { loadSection(kind) }
+        .font(.subheadline).frame(minHeight: 44).disabled(loading)
+    } else {
+      Text(loading ? "Loading overview…" : "This list is not shared by this connection.")
+        .font(.caption).foregroundStyle(.secondary)
+    }
   }
   private func contextChip(_ title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
@@ -308,8 +349,12 @@ private struct WorkDashboardProjectRow: View {
       if let task = done.first {
         WorkDashboardTaskPreview(label: "Done", task: task)
       }
-      Text(workDashboardCount(snapshot.issues(in: row.rowID).count, "issue") + (snapshot.complete ? "" : " loaded"))
-        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+      if snapshot.loadedKinds.contains("Issue") {
+        Text(workDashboardCount(snapshot.issues(in: row.rowID).count, "loaded issue"))
+          .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+      } else {
+        Text("Open for related work").font(.caption).foregroundStyle(.secondary)
+      }
     }.frame(maxWidth: .infinity, minHeight: 70, alignment: .leading).padding(.vertical, 4)
       .accessibilityElement(children: .combine)
   }
@@ -382,11 +427,19 @@ private struct WorkDashboardExpanded: View {
   let snapshot: WorkDashboard
   let destination: (WorkRecord) -> AnyView
   let scope: WorkDashboard.Scope
+  let loading: Bool
+  let loadSection: ((String) -> Void)?
+  let listKinds: Set<String>
+  let moreKinds: Set<String>
+  let message: String?
   @State private var search = ""
   @State private var project: String?
   init(panel: WorkDashboardView.Panel, snapshot: WorkDashboard, scope: WorkDashboard.Scope,
-       project: String?, destination: @escaping (WorkRecord) -> AnyView) {
+       project: String?, destination: @escaping (WorkRecord) -> AnyView, loading: Bool,
+       loadSection: ((String) -> Void)?, listKinds: Set<String>, moreKinds: Set<String>, message: String?) {
     self.panel = panel; self.snapshot = snapshot; self.scope = scope; self.destination = destination
+    self.loading = loading; self.loadSection = loadSection; self.listKinds = listKinds
+    self.moreKinds = moreKinds; self.message = message
     _project = State(initialValue: project)
   }
   private var rows: [WorkRecord] {
@@ -402,7 +455,7 @@ private struct WorkDashboardExpanded: View {
   var body: some View {
     List {
       Section {
-        Text(snapshot.complete ? "Within your shared Work" : "Loaded items only · return to Work to load more")
+        Text("Loaded items only · deeper work loads on request")
           .font(.footnote).foregroundStyle(.secondary)
         if panel == .activity {
           Picker("Project", selection: $project) {
@@ -411,6 +464,15 @@ private struct WorkDashboardExpanded: View {
           }
         }
       }
+      if let message { Text(message).font(.footnote).foregroundStyle(.secondary) }
+      let kinds = panel == .activity ? ["Issue"] : panel == .todo ? ["Task"] : panel == .all ? ["Issue", "Task", "Todo", "Proposal"] : []
+      ForEach(kinds, id: \.self) { kind in
+        if let loadSection, listKinds.contains(kind), !snapshot.loadedKinds.contains(kind) || moreKinds.contains(kind) {
+          Button(snapshot.loadedKinds.contains(kind) ? "Load more \(kind)" : "Load \(kind)") { loadSection(kind) }
+            .disabled(loading)
+        }
+      }
+      if loading { ProgressView("Loading work") }
       ForEach(rows, id: \.rowID) { row in
         NavigationLink { destination(row) } label: {
           if panel == .pulse { WorkDashboardProjectRow(row: row, snapshot: snapshot) }

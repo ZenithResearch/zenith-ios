@@ -3,6 +3,7 @@ import Foundation
 /// A read-only projection of the user's permitted, loaded Work. No parallel tracker.
 public struct WorkDashboard: Sendable {
   public enum Scope: Hashable, Sendable { case all, arena(String), initiative(String) }
+  public let loadedKinds: Set<String>
   public let records: [WorkRecord]
   public let arenas: [ArenaRecord]
   public let members: [String: Set<String>]
@@ -16,7 +17,9 @@ public struct WorkDashboard: Sendable {
 
   public init(records: [WorkRecord], arenas: [ArenaRecord] = [],
               members: [String: Set<String>] = [:], complete: Bool = false,
-              arenaMembershipComplete: Bool = false, parents: [String: String] = [:]) {
+              arenaMembershipComplete: Bool = false, parents: [String: String] = [:],
+              loadedKinds: Set<String> = ["Initiative", "Project", "Issue", "Task"]) {
+    self.loadedKinds = loadedKinds
     self.records = records; self.arenas = arenas; self.members = members
     self.complete = complete; self.arenaMembershipComplete = arenaMembershipComplete
     self.parents = parents
@@ -87,6 +90,9 @@ public struct WorkDashboard: Sendable {
       case .initiative(let key): return contains(row, within: key)
       }
     })
+  }
+  public func initiatives(in arena: String) -> [WorkRecord] {
+    initiatives.filter { arenas(for: $0).contains { $0.id == arena } }
   }
   public var initiatives: [WorkRecord] { recent(records.filter { $0.kind == "Initiative" }) }
   public var orderedArenas: [ArenaRecord] {

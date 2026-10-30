@@ -78,21 +78,54 @@ private actor DashboardSourceFixture: WorkDashboardSource {
 }
 
 final class WorkDashboardReaderTests: XCTestCase {
-  func testAllKindsAndPagesLoadAndSeparateRelationshipReadsRestoreScope() async throws {
+  func testOverviewLoadsOnlyArenasInitiativesAndEveryProjectPage() async throws {
     let source = try DashboardSourceFixture()
     let result = try await WorkDashboardReader().load(from: source)
     XCTAssertTrue(result.complete); XCTAssertFalse(result.canContinue)
-    XCTAssertEqual(Set(result.records.map(\.kind)), ["Todo", "Proposal", "Initiative", "Project", "Issue", "Task"])
-    XCTAssertEqual(result.records.count, 26)
+    XCTAssertEqual(Set(result.records.map(\.kind)), ["Initiative", "Project"])
+    XCTAssertEqual(result.loadedKinds, ["Initiative", "Project"])
+    XCTAssertEqual(result.records.count, 22)
+    XCTAssertEqual(result.dashboard.initiatives(in: "research").map(\.rowID), ["Initiative/root"])
     XCTAssertEqual(result.dashboard.projects(in: .arena("research")).count, 21)
     XCTAssertEqual(result.dashboard.projects(in: .initiative("Initiative/root")).count, 21)
-    let task = try XCTUnwrap(result.records.first { $0.kind == "Task" })
-    XCTAssertEqual(result.dashboard.context(for: task), "Research · p0")
-    XCTAssertEqual(result.dashboard.projects().first?.rowID, "Project/p0")
     let calls = await source.calls
+    XCTAssertEqual(calls.first, "arena.list")
+    XCTAssertEqual(calls.count, 7) // one Arena, one Initiative, members, two Project and two edge pages
     XCTAssertEqual(calls.filter { $0 == "list/Project" }.count, 2)
     XCTAssertEqual(calls.filter { $0 == "children/Initiative/root" }.count, 2)
-    XCTAssertFalse(calls.contains { $0.hasPrefix("parent/") })
+    XCTAssertTrue(calls.firstIndex(of: "arena.members/research")! < calls.firstIndex(of: "list/Project")!)
+    XCTAssertFalse(calls.contains { $0.hasPrefix("parent/") || $0.hasPrefix("children/Project/") || $0.hasPrefix("children/Issue/") })
+  }
+  @MainActor func testArenasAndInitiativeMembershipPublishBeforeProjects() async throws {
+    let source = try DashboardSourceFixture()
+    var snapshots: [WorkDashboardReadResult] = []
+    _ = try await WorkDashboardReader().load(from: source) { snapshots.append($0) }
+    XCTAssertFalse(try XCTUnwrap(snapshots.first).arenas.isEmpty)
+    XCTAssertTrue(try XCTUnwrap(snapshots.first).records.isEmpty)
+    XCTAssertTrue(snapshots.contains { !$0.dashboard.initiatives(in: "research").isEmpty && !$0.loadedKinds.contains("Project") })
+  }
+  func testIssuePageIsExplicitAndDoesNotCrawlItsTasks() async throws {
+    let source = try DashboardSourceFixture(relation: "parent")
+    let overview = try await WorkDashboardReader().load(from: source)
+    let result = try await WorkDashboardReader().loadPage(kind: "Issue", from: source, into: overview)
+    XCTAssertTrue(result.loadedKinds.contains("Issue"))
+    XCTAssertFalse(result.loadedKinds.contains("Task"))
+    XCTAssertEqual(result.dashboard.issues(in: "Project/p0").map(\.rowID), ["Issue/issue"])
+    let count = await source.calls.count
+    _ = try await WorkDashboardReader().loadPage(kind: "Issue", from: source, into: result)
+    let calls = await source.calls
+    XCTAssertEqual(calls.count, count) // finished pages are reused
+    XCTAssertFalse(calls.contains("list/Task"))
+    XCTAssertFalse(calls.contains("children/Issue/issue"))
+  }
+  func testOnDemandPaginationKeepsOverviewAndUsesNextCursor() async throws {
+    let source = try DashboardSourceFixture()
+    let first = try await WorkDashboardReader().loadPage(kind: "Project", from: source, into: .init())
+    XCTAssertEqual(first.records.count, 20); XCTAssertNotNil(first.cursors["Project"])
+    let second = try await WorkDashboardReader().loadPage(kind: "Project", from: source, into: first)
+    XCTAssertEqual(second.records.count, 21); XCTAssertNil(second.cursors["Project"])
+    let calls = await source.calls
+    XCTAssertEqual(calls, ["list/Project", "list/Project"])
   }
   func testExplicitArenaGetWorksWithoutBorrowingListPermission() async throws {
     let source = try DashboardSourceFixture(arenaList: false)
@@ -104,7 +137,7 @@ final class WorkDashboardReaderTests: XCTestCase {
   func testListOnlyDoesNotInventHierarchyOrRequestMoreAuthority() async throws {
     let source = try DashboardSourceFixture(relation: nil)
     let result = try await WorkDashboardReader().load(from: source)
-    XCTAssertEqual(result.records.count, 26); XCTAssertTrue(result.parents.isEmpty)
+    XCTAssertEqual(result.records.count, 22); XCTAssertTrue(result.parents.isEmpty)
     XCTAssertTrue(result.dashboard.projects(in: .arena("research")).isEmpty)
     XCTAssertTrue(result.notes.contains { $0.contains("parent/child") })
     let calls = await source.calls
@@ -114,7 +147,7 @@ final class WorkDashboardReaderTests: XCTestCase {
     let source = try DashboardSourceFixture(relation: "parent")
     let result = try await WorkDashboardReader().load(from: source)
     XCTAssertEqual(result.dashboard.projects(in: .arena("research")).count, 21)
-    XCTAssertEqual(result.parents["Task/task"], "Issue/issue")
+    XCTAssertEqual(result.parents["Project/p0"], "Initiative/root")
     let calls = await source.calls
     XCTAssertFalse(calls.contains { $0.hasPrefix("children/") })
   }
@@ -129,10 +162,10 @@ final class WorkDashboardReaderTests: XCTestCase {
     let source = try DashboardSourceFixture()
     let partial = try await WorkDashboardReader().load(from: source, requestLimit: 1)
     XCTAssertFalse(partial.complete); XCTAssertTrue(partial.canContinue)
-    XCTAssertFalse(partial.records.isEmpty)
+    XCTAssertFalse(partial.arenas.isEmpty)
     let full = try await WorkDashboardReader().load(from: source, requestLimit: 100)
     XCTAssertTrue(full.complete); XCTAssertFalse(full.canContinue)
-    XCTAssertEqual(full.records.count, 26)
+    XCTAssertEqual(full.records.count, 22)
   }
   func testDeniedReadStopsRatherThanFallingBackToAnotherScope() async throws {
     let source = try DashboardSourceFixture(fail: true)
@@ -141,6 +174,6 @@ final class WorkDashboardReaderTests: XCTestCase {
       XCTFail("Denied reads must propagate")
     } catch { XCTAssertTrue(error is WalletFailure) }
     let calls = await source.calls
-    XCTAssertEqual(calls.count, 1)
+    XCTAssertEqual(calls, ["arena.list", "list/Initiative"])
   }
 }

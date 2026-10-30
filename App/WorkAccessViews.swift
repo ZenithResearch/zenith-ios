@@ -378,6 +378,7 @@ struct NativeWorkView: View {
   @State private var loadEpoch = UUID()
   @State private var result = WorkDashboardReadResult()
   @State private var requestLimit = 1000
+  @State private var loadingKind: String?
   @State private var error: String?
   @State private var loading = false
   @State private var connection = false
@@ -397,6 +398,8 @@ struct NativeWorkView: View {
         destination: { row in AnyView(NativeWorkDetailView(row: row,
           canRead: result.detailKinds.contains(row.kind), loadedContext: dashboard, detailKinds: result.detailKinds)) },
         arenaDestination: { arena in AnyView(NativeArenaDetailView(id: arena.id)) },
+        loadSection: { kind in Task { await loadSection(kind) } },
+        listKinds: result.listKinds, moreKinds: Set(result.cursors.keys), loadingKind: loadingKind,
         captureText: $captureText, captures: $captures, captureRequested: $capture)
         .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
         .refreshable { await reload() }
@@ -422,9 +425,28 @@ struct NativeWorkView: View {
     }
     .onDisappear { client?.cancel() }
   }
+  private func loadSection(_ kind: String) async {
+    guard !loading, let client else { return }
+    let epoch = loadEpoch, generation = model.generation, network = privateNetwork.generation
+    func current() -> Bool {
+      !Task.isCancelled && epoch == loadEpoch && generation == model.generation
+        && (client.connection.network != .tailscale || network == privateNetwork.generation)
+    }
+    loading = true; loadingKind = kind; error = nil
+    defer { if current() { loading = false; loadingKind = nil } }
+    do {
+      let value = try await WorkDashboardReader().loadPage(kind: kind, from: client, into: result)
+      guard current() else { return }
+      result = value
+    } catch {
+      guard current() else { return }
+      if invalidatesWorkAccess(error) { result = WorkDashboardReadResult() }
+      self.error = error.localizedDescription
+    }
+  }
   private func reload() async {
     let epoch = UUID(); loadEpoch = epoch
-    client?.cancel(); result = WorkDashboardReadResult(); error = nil; loading = true
+    client?.cancel(); result = WorkDashboardReadResult(); error = nil; loading = true; loadingKind = nil
     let attempt = workConnectionLoadKey(model)
     let loaded = await workClient(model)
     guard !Task.isCancelled, epoch == loadEpoch, attempt == workConnectionLoadKey(model) else { loaded?.cancel(); return }

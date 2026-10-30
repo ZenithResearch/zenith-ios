@@ -18,6 +18,8 @@ context and separate Doing/Done task previews; issue counts stay secondary.
 The notepad editor has a quiet inset surface using native semantic colors.
 
 Arenas and Initiatives are context filters above the permanent project list.
+Selecting an Arena reveals a second compact track with its shared Initiatives;
+select an Initiative to narrow the Projects below without leaving the page.
 Projects rank by the latest valid update in the project or its loaded descendants.
 Activity previews Issues, with a separate project filter. Todo remains independently
 ordered by recorded priority and includes only not-started Tasks. Opening a Work
@@ -26,14 +28,39 @@ a collapsible description. Notepad is the Capture surface. The toolbar action
 scrolls to and focuses its multiline editor; Save note clears the editor and makes
 the text readable in Saved notes. Filters and source navigation preserve the draft
 while this page remains open. Notes are explicitly in page memory, not persistent
-storage or a Work write. iPhone places the notepad after Todo. A separate All shared
-work list keeps other permitted Work kinds reachable.
+storage or a Work write. iPhone places the notepad after Todo. A separate Browse loaded work list keeps other permitted Work kinds reachable
+through explicit per-kind page requests.
 
 The loader preserves the current Wallet-approved read client and its permission,
 expiry, lifecycle and private-network checks. All graph state is read through the
 existing SDK. Arena membership is loaded only under explicit Arena get permission.
-WorkDashboardReader automatically follows pages for every Work kind included in the approved list grants (including Proposal and Todo where shared). It reads Arena members and explicit children/parent relationships separately: per-operation list grants may intentionally omit parent edges. WorkDashboard retains those witnessed edges independently of list-summary fields. Explicit Arena get grants also work without collection-list authority. Pagination and hierarchy reads have a request budget; reaching it retains partial data and offers Continue loading. Counts and order describe loaded items. Unshared or
-unfinished membership is not inferred from project titles or working directories.
+WorkDashboardReader loads an overview, not the whole Work graph:
+
+1. Arena metadata appears first, without waiting for Work lists.
+2. Initiatives and explicit Arena membership appear next.
+3. All permitted Project list pages load, followed by Initiative → Project
+   relationship evidence. It never traverses Project or Issue children at startup.
+
+Only Initiative and Project collections are listed at startup. Scoped list grants
+may omit parent edges, so relationship evidence is retained separately from list
+summaries. Parent-only profiles can resolve Project parents without borrowing
+children authority. Explicit Arena get grants also work without collection-list
+permission. Selecting context reuses the loaded overview without another fetch.
+
+Activity and Todo stay unloaded until requested. Each action fetches one existing
+20-item Issue or Task page, plus authorized immediate parent evidence if needed.
+Further pages require Load more; completed lists are reused in page memory.
+Proposal and Todo records are also available through explicit Browse requests.
+Project detail and its Children links use the existing paged related-work reader,
+so opening a Project does not crawl every Task. Counts say **loaded** where only
+part of a list is available; an unrequested list is not reported as empty.
+
+Overview pagination and hierarchy reads retain a request budget and partial-data
+continuation. All requests keep cancellation, connection-generation, expiry and
+receiver scope checks. Refresh starts a fresh overview; no graph data persists
+beyond the authorized page lifecycle. Order uses only loaded record timestamps,
+not complete session activity. Unshared or unfinished membership is never inferred
+from titles or working directories.
 
 ## Additive consumer compatibility
 
